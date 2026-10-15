@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  chimp-crank-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chimp_fair_launch_crank
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - CHIMP_PROGRAM_ID=CH1MPfA1rLaunchEng1ne111111111111111111111
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_ORG/CHIMP_MONITOR
+      - RESEND_API_KEY=re_enterprise_key_prod_12345
+      - NOTIFICATION_EMAIL=lead-dev@chimpfairlaunch.io
+    ports:
+      - "8080:8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"

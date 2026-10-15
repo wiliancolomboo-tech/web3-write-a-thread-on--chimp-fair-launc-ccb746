@@ -1,0 +1,48 @@
+flowchart TD
+    subgraph Clients["User & Enterprise Operators"]
+        U1["Retail User / CLI"]
+        U2["Institutional Contributor"]
+        ADM["Launch Authority / Multisig"]
+        CRK["Autonomous Keeper / Crank"]
+    end
+
+    subgraph SolanaOnChain["Solana On-Chain State (Anchor Program)"]
+        CONF["LaunchConfig PDA\n(Bounds, Caps, State Flags)"]
+        VAULT_SOL["SOL Escrow Vault PDA\n(System Program Owned)"]
+        VAULT_TOKEN["$CHIMP Token Vault PDA\n(SPL Token ATA)"]
+        USER_POS["UserDeposit PDA\n(Individual Contribution & Claim State)"]
+        
+        CONF -->|Governs| VAULT_SOL
+        CONF -->|Governs| VAULT_TOKEN
+        USER_POS -->|Tracks Balance & Nonce| CONF
+    end
+
+    subgraph Operations["Execution Phases"]
+        P1["Phase 1: Epoch Open\nDeposits Accepted (SOL)"]
+        P2["Phase 2: Epoch Sealed\nPrice Discovery & Allocation Calculation"]
+        P3["Phase 3: Finalized\nToken Claim & Surplus SOL Refund"]
+    end
+
+    subgraph OffChainEngine["Enterprise Off-Chain Infrastructure"]
+        RPC["Solana Geyser / Enhanced RPC"]
+        LISTENER["Node.js / TS Event Ingester"]
+        DISCORD["Enterprise Discord / Slack Webhook"]
+        RESEND["Resend API (Executive Alerts)"]
+    end
+
+    U1 -->|1. deposit_sol()| P1
+    U2 -->|1. deposit_sol()| P1
+    P1 -->|Mutates| USER_POS
+    P1 -->|Transfers SOL| VAULT_SOL
+
+    ADM -->|2. seal_epoch()| P2
+    CRK -->|2. trigger_settlement()| P2
+    P2 -->|Derives Clearing Price| CONF
+
+    U1 -->|3. claim_tokens_and_refund()| P3
+    P3 -->|Distributes $CHIMP| VAULT_TOKEN
+    P3 -->|Refunds Surplus SOL| VAULT_SOL
+
+    RPC -->|Websocket Program Logs| LISTENER
+    LISTENER -->|JSON Payload| DISCORD
+    LISTENER -->|Priority Threshold Met| RESEND
