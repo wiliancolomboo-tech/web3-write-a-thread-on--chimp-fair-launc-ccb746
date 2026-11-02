@@ -1,0 +1,2 @@
+> User Allocation = (User SOL / Total SOL) * Tranche
+>

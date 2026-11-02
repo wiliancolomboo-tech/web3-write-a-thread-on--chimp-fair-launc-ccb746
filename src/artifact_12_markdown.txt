@@ -1,0 +1,7 @@
+4/8
+Mathematical Equalization: Pro-Rata Allocation ($P_{\text{fair}}$).
+
+Every participant pays the identical cleared price:
+$P = \frac{\Delta \text{SOL}_{\text{committed}}}{\text{Supply}_{\text{launch}}}$
+
+Deposit 1 SOL or 10 SOL, your per-token cost basis is identical down to the lamport. Whales cannot frontrun retail.

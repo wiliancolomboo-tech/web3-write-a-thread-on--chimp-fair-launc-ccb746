@@ -1,0 +1,8 @@
+At window close, the protocol trustlessly executes:
+1. Automated proportional allocation distribution
+2. Instant SOL excess refunds
+3. CPI AMM liquidity seeding + permanent LP burning to 11111...11111
+
+True DeFi transparency for the Jungle.
+
+Dive into the architecture: https://github.com/chimp-protocol/fair-launch

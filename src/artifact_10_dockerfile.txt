@@ -1,0 +1,17 @@
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+RUN apk add --no-cache python3 make g++ git
+
+COPY package*.json tsconfig.json ./
+RUN npm ci
+
+COPY src ./src
+
+RUN npm run build
+
+ENV NODE_ENV=production
+USER node
+
+CMD ["node", "dist/monitor.js"]

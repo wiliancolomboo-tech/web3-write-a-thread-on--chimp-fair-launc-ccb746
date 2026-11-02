@@ -1,0 +1,40 @@
+// src/notify.ts
+export async function postWebhook(
+  url: string | undefined,
+  payload: unknown,
+): Promise<void> {
+  if (!url) return;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`WEBHOOK_FAILED_${response.status}`);
+  }
+}
+
+export async function sendResendEmail(
+  apiKey: string | undefined,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<void> {
+  if (!apiKey) return;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ from, to, subject, html }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`RESEND_FAILED_${response.status}`);
+  }
+}

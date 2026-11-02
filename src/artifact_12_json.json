@@ -1,0 +1,11 @@
+{
+  "status": "ok",
+  "rpc": "ok",
+  "database": "ok",
+  "queue": "ok",
+  "discord": "ok",
+  "resend": "ok",
+  "last_processed_slot": 0,
+  "last_processed_signature": null,
+  "indexer_lag_slots": 0
+}

@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  chimp-monitor-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chimp_fair_launch_agent
+    restart: unless-stopped
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - POOL_STATE_ADDRESS=Ch1mpFa1rLaunch11111111111111111111111111111
+      - RESEND_API_KEY=re_live_chimp_production_key_here
+      - SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+      - OPS_ALERT_EMAIL=security@chimptoken.io
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"

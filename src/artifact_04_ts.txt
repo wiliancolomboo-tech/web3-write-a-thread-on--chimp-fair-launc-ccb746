@@ -1,0 +1,91 @@
+// src/core/fairLaunch.ts
+import { createHash } from "node:crypto";
+
+export type LaunchPhase = "NOT_STARTED" | "ACTIVE" | "CLOSED" | "FINALIZED";
+
+export interface LaunchConfig {
+  startUnix: bigint;
+  endUnix: bigint;
+  hardCapLamports: bigint;
+  minContributionLamports: bigint;
+  maxContributionLamports: bigint;
+  tokenInventoryBaseUnits: bigint;
+  allocationSeedHex: string;
+}
+
+export interface Position {
+  wallet: string;
+  contributedLamports: bigint;
+  claimedBaseUnits: bigint;
+  refundedLamports: bigint;
+}
+
+export function phase(config: LaunchConfig, nowUnix: bigint): LaunchPhase {
+  if (nowUnix < config.startUnix) return "NOT_STARTED";
+  if (nowUnix <= config.endUnix) return "ACTIVE";
+  return "CLOSED";
+}
+
+export function validateContribution(
+  config: LaunchConfig,
+  position: Position,
+  amountLamports: bigint,
+  nowUnix: bigint,
+  totalRaisedLamports: bigint,
+): void {
+  if (amountLamports <= 0n) throw new Error("amount must be positive");
+  if (phase(config, nowUnix) !== "ACTIVE") {
+    throw new Error("launch is not active");
+  }
+  if (amountLamports < config.minContributionLamports) {
+    throw new Error("amount below minimum");
+  }
+  if (position.contributedLamports + amountLamports >
+      config.maxContributionLamports) {
+    throw new Error("wallet contribution cap exceeded");
+  }
+  if (totalRaisedLamports + amountLamports > config.hardCapLamports) {
+    throw new Error("hard cap exceeded");
+  }
+}
+
+export function allocationFor(
+  config: LaunchConfig,
+  positionContributionLamports: bigint,
+  totalEligibleContributionLamports: bigint,
+): bigint {
+  if (totalEligibleContributionLamports <= 0n) return 0n;
+
+  const effectiveContribution =
+    positionContributionLamports > config.maxContributionLamports
+      ? config.maxContributionLamports
+      : positionContributionLamports;
+
+  return (
+    effectiveContribution * config.tokenInventoryBaseUnits
+  ) / totalEligibleContributionLamports;
+}
+
+export function claimable(
+  allocationBaseUnits: bigint,
+  alreadyClaimedBaseUnits: bigint,
+): bigint {
+  if (alreadyClaimedBaseUnits > allocationBaseUnits) {
+    throw new Error("claimed amount exceeds allocation");
+  }
+  return allocationBaseUnits - alreadyClaimedBaseUnits;
+}
+
+export function deterministicSeed(
+  committedSeedHex: string,
+  wallet: string,
+): Buffer {
+  if (!/^[0-9a-fA-F]{64}$/.test(committedSeedHex)) {
+    throw new Error("seed must be a 32-byte hex string");
+  }
+
+  return createHash("sha256")
+    .update(Buffer.from(committedSeedHex, "hex"))
+    .update(Buffer.from(wallet, "utf8"))
+    .digest();
+}

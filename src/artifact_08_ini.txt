@@ -1,0 +1,8 @@
+SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+PROGRAM_ID=CH1MP11111111111111111111111111111111111111
+POOL_ADDRESS=3xLw9bV2u3vDk1VvB...
+OPERATOR_PRIVATE_KEY=[1,2,3...255]
+DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+RESEND_API_KEY=re_123456789
+ALERT_EMAIL=security@chimpfairlaunch.io

@@ -1,0 +1,4 @@
+contracts/chimp_fair_launch/
+├── Cargo.toml
+└── src/
+    └── lib.rs

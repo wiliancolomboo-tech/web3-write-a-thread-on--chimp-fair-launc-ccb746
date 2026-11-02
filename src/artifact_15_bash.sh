@@ -1,0 +1,1 @@
+anchor run cancel-pool --program-id Ch1mpFa1rLaunch11111111111111111111111111111

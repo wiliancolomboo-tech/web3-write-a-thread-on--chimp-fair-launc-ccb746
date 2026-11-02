@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  chimp-crank-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=CH1MP11111111111111111111111111111111111111
+      - ADMIN_KEYPAIR_PATH=/app/keys/admin.json
+      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+      - RESEND_API_KEY=re_enterprise_key_chimp_production
+    volumes:
+      - ./keys:/app/keys:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Operational')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"

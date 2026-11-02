@@ -1,0 +1,68 @@
+import "dotenv/config";
+import express from "express";
+import { Connection, PublicKey } from "@solana/web3.js";
+
+const RPC_URL = process.env.RPC_URL ?? "https://api.devnet.solana.com";
+const LAUNCH_ADDRESS = process.env.LAUNCH_ADDRESS;
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const PORT = Number(process.env.PORT ?? 8080);
+
+if (!LAUNCH_ADDRESS) throw new Error("LAUNCH_ADDRESS is required");
+
+const connection = new Connection(RPC_URL, "confirmed");
+const launch = new PublicKey(LAUNCH_ADDRESS);
+const app = express();
+
+let lastObservedSlot = 0;
+let lastNotification = "";
+
+async function notify(message: string) {
+  if (!WEBHOOK_URL || message === lastNotification) return;
+  const response = await fetch(WEBHOOK_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ content: message, text: message })
+  });
+  if (!response.ok) throw new Error(`Webhook failed: ${response.status}`);
+  lastNotification = message;
+}
+
+async function poll() {
+  const slot = await connection.getSlot("confirmed");
+  lastObservedSlot = slot;
+
+  const info = await connection.getAccountInfo(launch, "confirmed");
+  if (!info) {
+    await notify(`⚠️ $CHIMP launch account ${launch.toBase58()} is missing`);
+    return;
+  }
+
+  console.log(JSON.stringify({
+    event: "launch_observed",
+    launch: launch.toBase58(),
+    slot,
+    lamports: info.lamports,
+    owner: info.owner.toBase58()
+  }));
+}
+
+app.get("/health", (_req, res) => {
+  res.json({
+    ok: true,
+    rpc: RPC_URL,
+    launch: launch.toBase58(),
+    lastObservedSlot
+  });
+});
+
+app.get("/ready", (_req, res) => {
+  res.status(lastObservedSlot > 0 ? 200 : 503).json({
+    ready: lastObservedSlot > 0
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`operator listening on :${PORT}`);
+  setInterval(() => poll().catch(console.error), 15_000);
+  poll().catch(console.error);
+});

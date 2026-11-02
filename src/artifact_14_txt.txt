@@ -1,0 +1,7 @@
+client/
+├── package.json
+├── tsconfig.json
+└── src/
+    ├── index.ts
+    ├── notifications.ts
+    └── config.ts

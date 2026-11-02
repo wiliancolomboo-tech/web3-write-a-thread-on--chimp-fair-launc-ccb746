@@ -1,0 +1,6 @@
+🧵 1/8
+Why do 99% of Solana memecoin & utility launches get completely wrecked in Block 0?
+
+Arbitrage MEV bots bribing Jito validators to vacuum supply before your transaction even hits the mempool.
+
+Enter the $CHIMP Fair Launch Architecture: A thread on building a truly MEV-immune launch. 👇🔬

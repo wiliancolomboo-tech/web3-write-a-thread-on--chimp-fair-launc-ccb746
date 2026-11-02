@@ -1,0 +1,7 @@
+Instead of a First-Come-First-Served race where bots win, $CHIMP uses an on-chain Batch Commitment Vault.
+
+1/ No dynamic bonding curve during deposits.
+2/ Slot-independent: Your price is identical whether you commit in slot 1 or slot 10,000.
+3/ Uniform clearing: Allocation = (Your SOL / Total SOL) * Supply.
+
+Front-running is mathematically dead. 🛡️

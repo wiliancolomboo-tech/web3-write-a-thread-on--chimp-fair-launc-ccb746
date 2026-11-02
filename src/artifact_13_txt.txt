@@ -1,0 +1,7 @@
+When the target threshold is reached, $CHIMP graduates: reserves lock into an unruggable canonical burn address atomically via CPI.
+
+The future of fair distribution on Solana is transparent, deterministic, and verifiable. 
+
+Part 2 dropping soon: Canonical AMM migration & cross-epoch distribution.
+
+Check out the full open-source repo & build with us: [LINK] 🍌🚀

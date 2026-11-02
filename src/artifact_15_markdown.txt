@@ -1,0 +1,5 @@
+7/8
+Off-Chain Observability:
+We paired the smart contract with an enterprise TypeScript daemon that watches Solana slots in real time, streaming IDL events directly to Discord, Telegram, and on-chain explorers.
+
+Full transparency from Slot 0 to Finalization.

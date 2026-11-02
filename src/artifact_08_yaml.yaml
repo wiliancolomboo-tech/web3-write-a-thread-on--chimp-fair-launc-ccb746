@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  chimp-keeper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - CHIMP_PROGRAM_ID=CH1MP11111111111111111111111111111111111111
+      - CHIMP_MINT_ADDRESS=Ch1mpTokenMintAddressHere111111111111111111
+      - KEEPER_KEYPAIR_JSON=${KEEPER_KEYPAIR_JSON}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"

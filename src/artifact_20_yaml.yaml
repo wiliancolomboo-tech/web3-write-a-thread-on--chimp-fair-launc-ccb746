@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  chimp-sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - SOLANA_WS_URL=wss://api.mainnet-beta.solana.com
+      - PROGRAM_ID=Ch1mpFa1rLaunch11111111111111111111111111111
+      - CHIMP_MINT=CH1MPxP8yW8B9g6h3V6b1vA8F1V2z6v6b1vA8F1V2z6v
+      - KEYPAIR_PATH=/run/secrets/agent_keypair.json
+      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+      - SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+    secrets:
+      - agent_keypair.json
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log(process.uptime() > 0 ? 0 : 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+secrets:
+  agent_keypair.json:
+    file: ./secrets/agent_keypair.json

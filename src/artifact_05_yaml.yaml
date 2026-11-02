@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  chimp-sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=CH1MP1aunch111111111111111111111111111111111
+      - ENTERPRISE_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports:
+      - "8080:8080"

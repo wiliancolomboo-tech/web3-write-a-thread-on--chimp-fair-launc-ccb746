@@ -1,0 +1,5 @@
+No hidden allocations. No preferential gas auctions. Pure mathematical fairness.
+
+Built on @solana with verified open-source Anchor contracts & enterprise event dispatchers powered by @resend.
+
+Read the Part 1 architecture breakdown and review the codebase: github.com/chimp-token/chimp-fair-launch 🐵🚀 [3/3]

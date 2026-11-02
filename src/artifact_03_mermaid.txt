@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    actor User as Contributor
+    participant CLI as Automation CLI / Web UI
+    participant Program as $CHIMP Fair Launch Program
+    participant Vault as Program Vault PDA
+    participant Webhook as Enterprise Webhook Service
+    participant DEX as External Notification Rails
+
+    User->>Program: deposit_sol(amount)
+    Program->>Vault: Transfer SOL to PDA Vault
+    Program->>Program: Update ContributorRecord & Launch State
+    Program-->>CLI: Emit DepositEvent
+    CLI->>Webhook: Forward event payload
+    Webhook->>DEX: Dispatch Slack / Discord / Resend Alerts
+
+    Note over Program,Vault: Slots elapse until end_slot reached
+
+    User->>Program: finalize_launch()
+    Program->>Program: Calculate Uniform Clearing Price
+    Program-->>CLI: Emit FinalizeEvent
+
+    User->>Program: claim_tokens_and_refund()
+    Program->>User: Transfer pro-rata $CHIMP Tokens
+    Program->>User: Transfer excess SOL (if over hard cap)
+    Program-->>CLI: Emit ClaimEvent

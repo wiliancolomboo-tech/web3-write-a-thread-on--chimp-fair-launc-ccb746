@@ -1,0 +1,16 @@
+FROM node:20-slim AS base
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package*.json tsconfig.json ./
+RUN npm ci
+
+COPY src ./src
+RUN npm run build
+
+USER node
+ENV NODE_ENV=production
+CMD ["node", "dist/keeper.js"]

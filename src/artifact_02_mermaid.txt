@@ -1,0 +1,52 @@
+flowchart TD
+    subgraph Users ["Contributors & Community"]
+        U1["User Wallet A (SOL)"]
+        U2["User Wallet B (SOL)"]
+        U3["User Wallet C (Whale)"]
+    end
+
+    subgraph SolanaCluster ["Solana Mainnet-Beta / Devnet"]
+        subgraph ChimpProgram ["$CHIMP Fair Launch Anchor Program"]
+            CFG["Pool Config PDA\n(caps, slots, status)"]
+            ESCROW["Pool Sol Vault PDA\n(System Escrow)"]
+            T_VAULT["Token Distribution Vault\n(SPL Mint Escrow)"]
+            USER_REC["User Contribution PDA\n(deposit_lamports, claimed)"]
+        end
+
+        RPC["Solana Geyser / Jito / Triton RPC Nodes"]
+    end
+
+    subgraph OffChainEngine ["Enterprise Automation Daemon & Observability"]
+        LISTENER["WebSocket Log Subscriber\n(anchor.EventParser)"]
+        STATE_MGR["Epoch State Transitioner\n(Auto-finalizer / Pump)"]
+        NOTIFIER["Enterprise Webhook Relay\n(Discord / Slack / Resend)"]
+    end
+
+    subgraph OpsNotification ["Operations & Public Feed"]
+        DISCORD["Discord #chimp-launch-feed"]
+        SLACK["Slack #incident-operations"]
+        GRAFANA["Enterprise APM / Prometheus"]
+    end
+
+    U1 -->|"1. deposit_sol()"| ChimpProgram
+    U2 -->|"1. deposit_sol()"| ChimpProgram
+    U3 -->|"1. deposit_sol() (Enforces Max Cap)"| ChimpProgram
+
+    ChimpProgram -->|"Updates State & Locks SOL"| ESCROW
+    ChimpProgram -->|"Tracks user shares"| USER_REC
+    ChimpProgram -->|"Emits ContributionEvent"| RPC
+
+    RPC -->|"WebSocket Stream: ProgramLogs"| LISTENER
+    LISTENER -->|"Validated Payload"| NOTIFIER
+    NOTIFIER -->|"Webhook Embed"| DISCORD
+    NOTIFIER -->|"Security Alert"| SLACK
+    LISTENER -->|"Metrics Dispatch"| GRAFANA
+
+    STATE_MGR -->|"Check End Slot"| RPC
+    STATE_MGR -->|"2. finalize_pool() (On Expiry)"| ChimpProgram
+    ChimpProgram -->|"Calculates Final Token Ratios"| CFG
+
+    U1 -->|"3. claim_tokens()"| ChimpProgram
+    ChimpProgram -->|"Transfers $CHIMP Tokens"| U1
+    ChimpProgram -->|"Refunds Excess Over-Allocated SOL"| U1
+    CFG -.->|"Unlocks Tokens"| T_VAULT

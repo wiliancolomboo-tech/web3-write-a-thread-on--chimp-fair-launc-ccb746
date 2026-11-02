@@ -1,0 +1,131 @@
+// src/sale-engine.ts
+export type SaleStatus =
+  | "DRAFT"
+  | "FUNDED"
+  | "OPEN"
+  | "FINALIZED_SUCCESS"
+  | "FINALIZED_FAILURE";
+
+export interface Sale {
+  startTs: number;
+  endTs: number;
+  priceLamportsPerToken: bigint;
+  maxPaymentPerWallet: bigint;
+  hardCapLamports: bigint;
+  minRaiseLamports: bigint;
+  vaultTokenBalance: bigint;
+  totalRaised: bigint;
+  totalAllocated: bigint;
+  status: SaleStatus;
+}
+
+export interface Participant {
+  contributed: bigint;
+  allocation: bigint;
+  claimed: boolean;
+  refunded: boolean;
+}
+
+export class SaleEngine {
+  constructor(
+    private readonly sale: Sale,
+    private readonly participants = new Map<string, Participant>(),
+  ) {}
+
+  fund(amount: bigint): void {
+    if (this.sale.status !== "DRAFT") throw new Error("INVALID_STATUS");
+    if (amount <= 0n) throw new Error("INVALID_FUNDING");
+    this.sale.vaultTokenBalance += amount;
+    this.sale.status = "FUNDED";
+  }
+
+  open(now: number): void {
+    if (this.sale.status !== "FUNDED") throw new Error("INVALID_STATUS");
+    if (now >= this.sale.endTs || now < this.sale.startTs) {
+      throw new Error("INVALID_TIME_WINDOW");
+    }
+    this.sale.status = "OPEN";
+  }
+
+  buy(wallet: string, payment: bigint, now: number): bigint {
+    if (this.sale.status !== "OPEN") throw new Error("SALE_NOT_OPEN");
+    if (now < this.sale.startTs || now >= this.sale.endTs) {
+      throw new Error("SALE_NOT_ACTIVE");
+    }
+    if (!wallet) throw new Error("INVALID_WALLET");
+    if (payment <= 0n) throw new Error("INVALID_PAYMENT");
+
+    const current = this.participants.get(wallet) ?? {
+      contributed: 0n,
+      allocation: 0n,
+      claimed: false,
+      refunded: false,
+    };
+
+    if (current.contributed + payment > this.sale.maxPaymentPerWallet) {
+      throw new Error("WALLET_CAP_EXCEEDED");
+    }
+
+    if (this.sale.totalRaised + payment > this.sale.hardCapLamports) {
+      throw new Error("HARD_CAP_EXCEEDED");
+    }
+
+    const allocation = payment / this.sale.priceLamportsPerToken;
+    if (allocation <= 0n) throw new Error("PAYMENT_BELOW_MINIMUM_UNIT");
+    if (this.sale.totalAllocated + allocation > this.sale.vaultTokenBalance) {
+      throw new Error("INSUFFICIENT_TOKEN_VAULT");
+    }
+
+    current.contributed += payment;
+    current.allocation += allocation;
+    this.participants.set(wallet, current);
+
+    this.sale.totalRaised += payment;
+    this.sale.totalAllocated += allocation;
+    return allocation;
+  }
+
+  finalize(now: number): SaleStatus {
+    if (this.sale.status !== "OPEN") throw new Error("INVALID_STATUS");
+    if (now < this.sale.endTs && this.sale.totalRaised < this.sale.hardCapLamports) {
+      throw new Error("SALE_NOT_FINISHED");
+    }
+
+    this.sale.status =
+      this.sale.totalRaised >= this.sale.minRaiseLamports
+        ? "FINALIZED_SUCCESS"
+        : "FINALIZED_FAILURE";
+
+    return this.sale.status;
+  }
+
+  claim(wallet: string): bigint {
+    if (this.sale.status !== "FINALIZED_SUCCESS") {
+      throw new Error("CLAIMS_NOT_ENABLED");
+    }
+
+    const p = this.participants.get(wallet);
+    if (!p) throw new Error("NO_ALLOCATION");
+    if (p.claimed) throw new Error("ALREADY_CLAIMED");
+
+    p.claimed = true;
+    return p.allocation;
+  }
+
+  refund(wallet: string): bigint {
+    if (this.sale.status !== "FINALIZED_FAILURE") {
+      throw new Error("REFUNDS_NOT_ENABLED");
+    }
+
+    const p = this.participants.get(wallet);
+    if (!p) throw new Error("NO_CONTRIBUTION");
+    if (p.refunded) throw new Error("ALREADY_REFUNDED");
+
+    p.refunded = true;
+    return p.contributed;
+  }
+
+  snapshot(): Sale {
+    return structuredClone(this.sale);
+  }
+}

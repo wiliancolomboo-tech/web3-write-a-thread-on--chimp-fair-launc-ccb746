@@ -1,0 +1,1 @@
+solana account <POOL_PDA_ADDRESS> --output json

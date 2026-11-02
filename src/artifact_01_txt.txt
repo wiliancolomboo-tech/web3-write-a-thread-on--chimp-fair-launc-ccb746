@@ -1,0 +1,10 @@
++-----------------------------------------------------------------------------------+
+|                               Enterprise Impact Matrix                            |
++-----------------------------------+-----------------------------------------------+
+| Vector                            | Metric / Impact                               |
++-----------------------------------+-----------------------------------------------+
+| MEV / Sandwich Mitigation         | 100% immune during Capital Seeding Phase      |
+| Front-running Vector Surface      | 0% (Batch Pro-Rata Settlement)                |
+| Max Capital Concentration Per K   | Cryptographically capped per User PDA         |
+| Operational Latency               | Sub-second automated webhook dispatch         |
++-----------------------------------+-----------------------------------------------+

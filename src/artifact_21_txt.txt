@@ -1,0 +1,13 @@
+OPERATIONAL RUNBOOK MATRIX
++------------------------------------+------------------------------------+-----------------------------------+
+| Scenario                           | Immediate Diagnostic               | Remediation Action                |
++------------------------------------+------------------------------------+-----------------------------------+
+| RPC Slot Desync / Stalled Crank    | GET /health returns 503            | Failover to secondary Helius/     |
+|                                    | "Slot delta > 50"                  | Triton RPC node endpoint.         |
+| User Cap Bypass Attempt            | Alert: UserCapExceeded             | None. Program PDA enforces        |
+|                                    | in Sentinel logs                   | rejection atomically on-chain.    |
+| Unsettled Epoch with Expired Slot  | Check LaunchConfig.status          | Execute emergency manual trigger: |
+|                                    | via CLI                            | `npx ts-node client/cli.ts crank` |
+| Token Vault Underfunded            | Settle event fails with            | Transfer deficit $CHIMP tokens    |
+|                                    | InsufficientTokenReserve           | to `token_vault` PDA.             |
++------------------------------------+------------------------------------+-----------------------------------+

@@ -1,0 +1,6 @@
+2/8
+Traditional AMM launches are mathematically broken for retail. 
+
+When a pool opens at Block N, high-frequency bot bundles bid hundreds of SOL in tips to take the first 4 slots of the block.
+
+By Block N+1, retail is buying at an 800% premium. That is not a fair launch; it is a liquidity exit trap. 📉

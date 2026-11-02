@@ -1,0 +1,1 @@
+docker-compose logs -f chimp-crank-orchestrator | grep "CRANK"

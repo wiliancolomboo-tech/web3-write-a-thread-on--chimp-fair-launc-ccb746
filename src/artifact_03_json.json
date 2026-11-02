@@ -1,0 +1,22 @@
+{
+  "name": "chimp-fair-launch-daemon",
+  "version": "1.0.0",
+  "description": "Enterprise Event Listener, Webhook Telemetry & X-Thread Broadcaster for $CHIMP",
+  "main": "dist/agent.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/agent.js",
+    "dev": "ts-node src/agent.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.29.0",
+    "@solana/web3.js": "^1.91.0",
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "twitter-api-v2": "^1.16.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

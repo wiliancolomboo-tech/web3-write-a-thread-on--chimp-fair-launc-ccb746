@@ -1,0 +1,5 @@
++-------------------------------------------------------+
+|  Epoch 0: Deposit Escrow (Capped per Wallet)          |
+|  Epoch 1: Deterministic Uniform Clearing Price        |
+|  Epoch 2: Pro-Rata Non-Custodial Token Claims         |
++-------------------------------------------------------+

@@ -1,0 +1,50 @@
+flowchart TD
+    subgraph Users ["Retail & Community Participants"]
+        U1["User 1 (SOL Deposit)"]
+        U2["User 2 (SOL Deposit)"]
+        UN["User N (SOL Deposit)"]
+    end
+
+    subgraph Program ["Solana Runtime: Chimp Fair Launch Program"]
+        direction TB
+        Init["fair_launch::initialize\n(Config, Caps, Epoch Windows)"]
+        Vault["PDA: Vault Account\n(Holds Committed SOL)"]
+        Escrow["PDA: Chimp Token Escrow\n(Holds Total $CHIMP Supply)"]
+        UserReceipt["PDA: User Contribution Account\n(Tracks Cumulative Lamports)"]
+        
+        Settle["fair_launch::settle_pool\n(Freeze Epoch, Compute Clearing Rate)"]
+        Claim["fair_launch::claim_tokens\n(Pro-Rata $CHIMP Distribution)"]
+        Migrate["fair_launch::migrate_liquidity\n(CPI to AMM + Burn LP)"]
+    end
+
+    subgraph OffChain ["Enterprise Automation & Telemetry"]
+        Keeper["Chimp Keeper Bot\n(Node.js / Anchor Client)"]
+        RPC["Solana Geyser / Jito RPC"]
+        Alert["Discord / Slack / Resend Notification Engine"]
+    end
+
+    subgraph DEX ["Solana DeFi Liquidity Layer"]
+        Raydium["AMM Liquidity Pool\n(SOL / $CHIMP)"]
+        BurnAcc["Permanent Burn Address\n(Token Mint Burn)"]
+    end
+
+    %% Deposit Flow
+    U1 -->|Deposit SOL| Vault
+    U2 -->|Deposit SOL| Vault
+    UN -->|Deposit SOL| Vault
+    Vault -.->|Record Lamports| UserReceipt
+
+    %% Lifecycle Transitions
+    Init --> Vault
+    Init --> Escrow
+    Keeper -->|Monitor Final Slot| RPC
+    RPC -->|Slot >= End Slot| Keeper
+    Keeper -->|Execute Settlement TX| Settle
+    Settle -->|Trigger Alert| Alert
+
+    %% Settlement & Post-Launch
+    UserReceipt -->|Proof of Lamports| Claim
+    Claim -->|Transfer $CHIMP| U1
+    Settle --> Migrate
+    Migrate -->|Seed Initial Liquidity| Raydium
+    Migrate -->|Dead Address Transfer| BurnAcc

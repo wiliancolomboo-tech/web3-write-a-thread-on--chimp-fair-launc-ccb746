@@ -1,0 +1,5 @@
+Traditional Bonding Curve:
+  [Block 0: Bots Snipe 80%] ➔ [Block 5: Retail Buys High] ➔ [Block 10: Bot Dump]
+  
+  $CHIMP Proportional Epoch:
+  [Slot X ➔ Slot X+N] ➔ Uniform Batch Clearing ➔ Proportional Delivery (Zero MEV)

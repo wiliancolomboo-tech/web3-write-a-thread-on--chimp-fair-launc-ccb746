@@ -1,0 +1,11 @@
+Created
+  ↓
+Activated
+  ↓
+Deposits Open
+  ↓
+Deposits Closed
+  ↓
+Finalized
+  ├── Refund available
+  └── Token claim available

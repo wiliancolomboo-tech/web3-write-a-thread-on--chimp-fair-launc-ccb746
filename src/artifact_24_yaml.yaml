@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  chimp-sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_ENDPOINT=${SOLANA_RPC_ENDPOINT}
+      - PROGRAM_ID=${PROGRAM_ID}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - ADMIN_ALERT_EMAIL=${ADMIN_ALERT_EMAIL}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'process.exit(0)'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

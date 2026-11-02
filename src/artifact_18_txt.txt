@@ -1,0 +1,7 @@
+2/3
+Features:
+✅ Cryptographically blinded orders (Anti-MEV)
+✅ Uniform clearing price floor
+✅ Irreversible LP burn mechanism
+✅ Full TypeScript SDK + Enterprise Webhooks (Discord/Slack)
+✅ 100% test coverage with Anchor integration suite

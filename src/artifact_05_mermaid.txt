@@ -1,0 +1,31 @@
+flowchart TD
+    U[Participant Wallet] -->|Deposit SOL| W[Solana Wallet Adapter]
+    W -->|deposit instruction| P[$CHIMP Fair Launch Program]
+
+    P --> L[Launch PDA]
+    P --> PA[Participant PDA]
+    P --> SV[Program-Derived SOL Vault]
+
+    ADMIN[Launch Authority] -->|create / activate / close / finalize| P
+    MINT[$CHIMP SPL Mint] --> TV[SPL Token Vault ATA]
+    TV -->|claim allocation| UATA[Participant Token ATA]
+
+    P -->|state transition event| RPC[Solana RPC]
+    RPC --> IDX[Indexer / Automation Worker]
+
+    IDX --> DB[(Optional PostgreSQL)]
+    IDX --> API[Read API / Health Endpoint]
+    IDX --> RESEND[Resend Email API]
+    IDX --> SLACK[Slack/Discord Webhook]
+    IDX --> OBS[Structured Logs / Metrics]
+
+    P -->|finalization proof| EXPLORER[Solana Explorer]
+    U -->|independent verification| EXPLORER
+
+    subgraph State Machine
+      S1[Created] --> S2[Active]
+      S2 --> S3[Deposits Open]
+      S3 --> S4[Deposits Closed]
+      S4 --> S5[Finalized]
+      S5 --> S6[Claim / Refund]
+    end

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  chimp-keeper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chimp_fair_launch_keeper
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=Ch1mpFa1rLaunch111111111111111111111111111
+      - TOKEN_MINT=CHIMP6kG2nF6L8z3u7rYxW4sQ1vM9pT5aBcDeFgHiJkL
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - ALERT_EMAIL=ops@chimpfairlaunch.io
+    ports:
+      - "8080:8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

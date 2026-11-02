@@ -1,0 +1,5 @@
+5/8
+Anti-Whale Encasement:
+To prevent capital dominance, the $CHIMP engine implements strict per-wallet hard caps enforced inside the Anchor instruction checks.
+
+Any capital committed beyond the cap is rejected on-chain; oversubscribed rounds return unallocated SOL automatically. Zero fee penalty.

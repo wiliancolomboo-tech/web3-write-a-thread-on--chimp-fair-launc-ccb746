@@ -1,0 +1,86 @@
+// test/sale-engine.test.ts
+import { describe, expect, it } from "vitest";
+import { SaleEngine } from "../src/sale-engine";
+
+const makeEngine = () =>
+  new SaleEngine({
+    startTs: 100,
+    endTs: 200,
+    priceLamportsPerToken: 10n,
+    maxPaymentPerWallet: 100n,
+    hardCapLamports: 1_000n,
+    minRaiseLamports: 500n,
+    vaultTokenBalance: 0n,
+    totalRaised: 0n,
+    totalAllocated: 0n,
+    status: "DRAFT",
+  });
+
+describe("fair launch engine", () => {
+  it("funds and opens", () => {
+    const e = makeEngine();
+    e.fund(100n);
+    e.open(100);
+    expect(e.snapshot().status).toBe("OPEN");
+  });
+
+  it("allocates at a deterministic price", () => {
+    const e = makeEngine();
+    e.fund(100n);
+    e.open(100);
+
+    expect(e.buy("alice", 50n, 101)).toBe(5n);
+    expect(e.snapshot().totalRaised).toBe(50n);
+  });
+
+  it("rejects wallet cap violations", () => {
+    const e = makeEngine();
+    e.fund(100n);
+    e.open(100);
+
+    expect(() => e.buy("alice", 101n, 101)).toThrow("WALLET_CAP_EXCEEDED");
+  });
+
+  it("rejects purchases outside the sale window", () => {
+    const e = makeEngine();
+    e.fund(100n);
+    e.open(100);
+
+    expect(() => e.buy("alice", 10n, 200)).toThrow("SALE_NOT_ACTIVE");
+  });
+
+  it("supports successful claims", () => {
+    const e = makeEngine();
+    e.fund(100n);
+    e.open(100);
+    e.buy("alice", 50n, 101);
+
+    // Raise the sale above the minimum in a second purchase.
+    e.buy("bob", 450n, 102);
+    e.finalize(200);
+
+    expect(e.claim("alice")).toBe(5n);
+    expect(() => e.claim("alice")).toThrow("ALREADY_CLAIMED");
+  });
+
+  it("supports refunds when minimum raise is not met", () => {
+    const e = makeEngine();
+    e.fund(100n);
+    e.open(100);
+    e.buy("alice", 50n, 101);
+    e.finalize(200);
+
+    expect(e.refund("alice")).toBe(50n);
+    expect(() => e.refund("alice")).toThrow("ALREADY_REFUNDED");
+  });
+
+  it("rejects claims after a failed sale", () => {
+    const e = makeEngine();
+    e.fund(100n);
+    e.open(100);
+    e.buy("alice", 50n, 101);
+    e.finalize(200);
+
+    expect(() => e.claim("alice")).toThrow("CLAIMS_NOT_ENABLED");
+  });
+});

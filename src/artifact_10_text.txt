@@ -1,0 +1,6 @@
+2/3 🛠️ How does $CHIMP solve this?
+
+Instead of an instant-swap bonding curve, we built an Epoch Commit-Batch Engine on @AnchorLang:
+✅ Zero spot swaps during deposit phase = zero sandwich attacks
+✅ Uniform Clearing Price (UCP): Everyone gets the exact same rate
+✅ Sybil-resistant wallet caps

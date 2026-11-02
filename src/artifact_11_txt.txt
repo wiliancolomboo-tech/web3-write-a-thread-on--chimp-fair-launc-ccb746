@@ -1,0 +1,8 @@
+How does it work under the hood? 🛠️
+
+1/ Instead of bonding curves vulnerable to slippage manipulation, $CHIMP uses slot-bounded deposit escrow PDAs.
+2/ Mathematical price discovery: P = Total SOL Escrowed / $CHIMP Allocation.
+3/ Strict wallet caps enforce decentralization.
+4/ 100% of initial LP is permanently burned via PDA CPI graduation.
+
+Clean Rust Anchor code with 0 stubs.

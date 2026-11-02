@@ -1,0 +1,8 @@
+2/7 How does $CHIMP stop MEV?
+
+✅ PDA-Enforced Virtual Bonding Curves ($x \cdot y = k$)
+✅ Slot-gated anti-snipe cooldowns to clamp high-frequency extraction
+✅ Merkle-verified identity allowances with deterministic linear caps
+✅ Programmatic zero-human pool graduation to DEX LP burning
+
+Code speaks louder than promises.

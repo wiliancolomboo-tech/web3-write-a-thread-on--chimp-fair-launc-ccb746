@@ -1,0 +1,8 @@
+What about rug protection? 
+
+🔒 Strict Soft-Cap verification in Rust/Anchor: If minimum community interest isn't met, 100% of native SOL is refundable atomically via PDAs.
+💧 If reached, LP tokens are auto-locked.
+
+No backdoor. Zero admin minting after launch. 
+
+Read our open-source codebase & join the troop! 🍌🚀

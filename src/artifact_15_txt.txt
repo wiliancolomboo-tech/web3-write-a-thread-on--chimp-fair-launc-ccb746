@@ -1,0 +1,5 @@
+6/8 What if market conditions shift? 
+
+If the soft cap isn’t met when the clock reaches `end_slot`, the state machine flips to `is_aborted = true`.
+
+Every contributor retains the cryptographic right to reclaim 100% of their SOL with zero fees deducted.

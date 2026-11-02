@@ -1,0 +1,1 @@
+npx ts-node scripts/force-finalize.ts --pool <POOL_PDA_ADDRESS>

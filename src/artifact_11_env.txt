@@ -1,0 +1,6 @@
+ANCHOR_PROVIDER_URL=https://api.mainnet-beta.solana.com
+ANCHOR_WALLET=/app/keys/payer.json
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+CHIMP_TOKEN_MINT=CH1MPXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

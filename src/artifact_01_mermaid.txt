@@ -1,48 +1,35 @@
 flowchart TD
-    subgraph Clients["User & Enterprise Operators"]
-        U1["Retail User / CLI"]
-        U2["Institutional Contributor"]
-        ADM["Launch Authority / Multisig"]
-        CRK["Autonomous Keeper / Crank"]
+    subgraph Clients ["Client & Automation Tier"]
+        U1["Retail Contributor"]
+        U2["Institutional Participant"]
+        KEEPER["Enterprise Chimp Keeper / Bot"]
+        HOOK["Enterprise Webhook Relay\n(Discord / Slack / Resend)"]
     end
 
-    subgraph SolanaOnChain["Solana On-Chain State (Anchor Program)"]
-        CONF["LaunchConfig PDA\n(Bounds, Caps, State Flags)"]
-        VAULT_SOL["SOL Escrow Vault PDA\n(System Program Owned)"]
-        VAULT_TOKEN["$CHIMP Token Vault PDA\n(SPL Token ATA)"]
-        USER_POS["UserDeposit PDA\n(Individual Contribution & Claim State)"]
-        
-        CONF -->|Governs| VAULT_SOL
-        CONF -->|Governs| VAULT_TOKEN
-        USER_POS -->|Tracks Balance & Nonce| CONF
+    subgraph SolanaCluster ["Solana Runtime (Anchor Program)"]
+        CONFIG["Global Config PDA\n['config', mint]"]
+        VAULT["SOL Treasury PDA\n['vault', config]"]
+        MINT["$CHIMP Mint Authority PDA"]
+        USER_ESCROW["User Escrow PDA\n['user_escrow', config, user]"]
+        ESCROW_TOKEN["Token Vault PDA\n['token_vault', config]"]
     end
 
-    subgraph Operations["Execution Phases"]
-        P1["Phase 1: Epoch Open\nDeposits Accepted (SOL)"]
-        P2["Phase 2: Epoch Sealed\nPrice Discovery & Allocation Calculation"]
-        P3["Phase 3: Finalized\nToken Claim & Surplus SOL Refund"]
+    subgraph DEXLiquidity ["DEX Liquidity Migration"]
+        RAYDIUM["Raydium / Meteora Liquidity Pool"]
+        BURN["LP Token Burn Address\n(Immutable Dead PDA)"]
     end
 
-    subgraph OffChainEngine["Enterprise Off-Chain Infrastructure"]
-        RPC["Solana Geyser / Enhanced RPC"]
-        LISTENER["Node.js / TS Event Ingester"]
-        DISCORD["Enterprise Discord / Slack Webhook"]
-        RESEND["Resend API (Executive Alerts)"]
-    end
+    U1 -->|1. Commit SOL (Slot X..Y)| USER_ESCROW
+    U2 -->|1. Commit SOL (Slot X..Y)| USER_ESCROW
+    USER_ESCROW -->|Aggregates into| VAULT
 
-    U1 -->|1. deposit_sol()| P1
-    U2 -->|1. deposit_sol()| P1
-    P1 -->|Mutates| USER_POS
-    P1 -->|Transfers SOL| VAULT_SOL
+    KEEPER -->|2. Check Finalized Slot > EndSlot| CONFIG
+    KEEPER -->|3. Trigger Finalize Epoch| CONFIG
 
-    ADM -->|2. seal_epoch()| P2
-    CRK -->|2. trigger_settlement()| P2
-    P2 -->|Derives Clearing Price| CONF
+    CONFIG -->|4. Unlock Claims| USER_ESCROW
+    CONFIG -->|5. Auto-Migrate Protocol Liquidity| RAYDIUM
+    RAYDIUM -->|6. Permanent LP Lock| BURN
 
-    U1 -->|3. claim_tokens_and_refund()| P3
-    P3 -->|Distributes $CHIMP| VAULT_TOKEN
-    P3 -->|Refunds Surplus SOL| VAULT_SOL
-
-    RPC -->|Websocket Program Logs| LISTENER
-    LISTENER -->|JSON Payload| DISCORD
-    LISTENER -->|Priority Threshold Met| RESEND
+    U1 -->|7. Permissionless Claim $CHIMP & Excess SOL| USER_ESCROW
+    USER_ESCROW -->|8. Transfer Minted $CHIMP| U1
+    CONFIG -.->|Telemetry Event Dispatch| HOOK

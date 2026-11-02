@@ -1,0 +1,6 @@
+11/ In Part 2 of this series, we’ll dive into:
+- The exact Token-2022 Transfer Hook architecture
+- Cliff-vesting claim streams
+- Automated on-chain buyback and burn mechanics
+
+The future of token launches on Solana belongs to fair, programmatic distribution.

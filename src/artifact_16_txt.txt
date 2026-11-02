@@ -1,0 +1,3 @@
+7/8 We built a production-grade TypeScript crank daemon monitoring slot heights and dispatching automated Webhook & Resend telemetry alerts.
+
+From the first deposit to automated settlement, every state change is audited, indexed, and observable in real-time.

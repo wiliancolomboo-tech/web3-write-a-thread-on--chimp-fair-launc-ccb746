@@ -1,0 +1,7 @@
+Full open-source production release is live:
+✅ Verified Anchor Program with checked math & PDA vaults
+✅ Enterprise webhook automation (Discord, Slack, @resend)
+✅ 100% Pass Rate Test Suite (Refunds, Caps, & Claims)
+✅ Turnkey Dockerized daemon
+
+Check out the full repository & technical architecture! 🍌🚀 @Solana

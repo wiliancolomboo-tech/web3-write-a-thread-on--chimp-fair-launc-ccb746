@@ -1,0 +1,15 @@
+{
+  "protocol": "CHIMP_FAIR_LAUNCH",
+  "version": "1.0.0",
+  "event": "LAUNCH_FINALIZED",
+  "cluster": "mainnet-beta",
+  "timestamp": 1735689600,
+  "metrics": {
+    "launch_pda": "6sH8Wk...K9j2",
+    "total_sol_committed": 2450.85,
+    "hard_cap_sol": 2000.00,
+    "oversubscription_ratio": 1.2254,
+    "clearing_price_lamports_per_chimp": 25000,
+    "unique_participants": 1842
+  }
+}

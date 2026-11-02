@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  chimp-fair-launch-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chimp_pool_telemetry
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=CH1MP11111111111111111111111111111111111111
+      - POOL_MINT=CHIMPq7wNfB2eYtqN9V4gA3aLwYpLw8E7sW8qZz2pump
+      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+      - RESEND_API_KEY=re_123456789
+      - ALERT_EMAIL=security@chimpresearch.io
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

@@ -1,0 +1,6 @@
+NODE_ENV=production
+RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+PROGRAM_ID=CH1MPy8vD2U3Wk1y7k7o3Vn8XoVq2C9E4bXk5M8Ppump
+CHIMP_TOKEN_MINT=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
+CRANK_KEYPAIR_PATH=/etc/chimp/crank-keypair.json
+NOTIFICATION_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder

@@ -1,0 +1,9 @@
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+KEEPER_KEYPAIR_PATH=/etc/chimp/keys/id.json
+CHIMP_MINT_ADDRESS=CH1MPva111111111111111111111111111111111111
+PROGRAM_ID=CH1MPva111111111111111111111111111111111111
+SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+RESEND_API_KEY=re_123456789
+ADMIN_EMAIL=security@chimpfairlaunch.io
+PORT=8080

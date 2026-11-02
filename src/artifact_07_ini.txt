@@ -1,0 +1,5 @@
+SOLANA_RPC_URL="https://api.mainnet-beta.solana.com"
+KEYPAIR_PATH="/app/keys/keeper-wallet.json"
+PROGRAM_ID="CHiMPFnP9Q8b5QG4hR9Z1xZgVyS1H4sHwN5C7d3VpUMp"
+POOL_ADDRESS="8kXgCqXWdMvC3B9QW8K6J2y9FhX4m9PqR1zT5uV8wXy"
+DISCORD_WEBHOOK_URL="https://api.example.com/webhooks/alerts/placeholder"

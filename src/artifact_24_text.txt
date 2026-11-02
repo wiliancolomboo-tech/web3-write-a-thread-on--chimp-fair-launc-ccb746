@@ -1,0 +1,5 @@
+7/7 🍌 Fair distribution is non-negotiable for Web3 longevity. $CHIMP isn’t just a launch—it’s an open-source standard for anti-MEV liquidity bootstrapping on Solana.
+
+Read Part 1 of the architecture & inspect the code below! 🚀
+
+Github / Docs: https://github.com/chimp-protocol/fair-launch-engine

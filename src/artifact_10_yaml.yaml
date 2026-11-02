@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  chimp-sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["watch", "-r", "https://api.mainnet-beta.solana.com", "-k", "/secrets/deployer.json", "-i", "./target/idl/chimp_fair_launch.json", "-p", "CH1MP1aunchXvL8xGk8xK8vBwFzV8qg2p9vRjNmK9XkQ", "-l", "1001"]
+    volumes:
+      - ./secrets:/secrets:ro
+    environment:
+      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+      - RESEND_API_KEY=re_enterprise_key_test
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

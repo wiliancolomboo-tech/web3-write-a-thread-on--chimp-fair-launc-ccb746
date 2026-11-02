@@ -1,0 +1,10 @@
+3/8 If oversubscribed, excess SOL refunds automatically into contributor PDAs upon claiming.
+
+✅ Non-reentrant Anchor PDAs
+✅ Pro-rata allocation clearing
+✅ Program-controlled liquidity lock
+✅ Discord/Slack webhook observability
+
+Real fair launches on Solana are math, not luck. 
+
+Check our open-source repo & live runbook: https://github.com/chimp-solana/fair-launch-engine

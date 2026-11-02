@@ -1,13 +1,15 @@
-# 1. Install Anchor & Solana CLI tools
-solana-keygen new --no-bip39-passphrase -o deployer-keypair.json
-solana config set --url https://api.devnet.solana.com
-solana airdrop 2 deployer-keypair.json
+# 1. Environment initialization
+anchor build
 
-# 2. Build Anchor Artifacts deterministically
-anchor build --verifiable
+# 2. Verify deterministic binary hashes
+sha256sum target/deploy/chimp_fair_launch.so
 
-# 3. Synchronize Program ID
-anchor keys sync
+# 3. Deploy to Solana Devnet / Mainnet-Beta
+solana program deploy \
+  --program-id target/deploy/chimp_fair_launch-keypair.json \
+  target/deploy/chimp_fair_launch.so \
+  --url https://api.devnet.solana.com
 
-# 4. Deploy to Solana Devnet / Mainnet-Beta
-anchor deploy --provider.cluster devnet --program-keypair target/deploy/chimp_fair_launch-keypair.json
+# 4. Initialize launch pool via Anchor
+npm install
+npx ts-node scripts/init-launch.ts

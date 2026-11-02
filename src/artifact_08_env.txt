@@ -1,0 +1,6 @@
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+KEYPAIR_PATH=./secrets/crank-keypair.json
+IDL_PATH=./target/idl/chimp_fair_launch.json
+PROGRAM_ID=CHMPf1rLaunch11111111111111111111111111111
+POOL_ID=1
+ENTERPRISE_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder

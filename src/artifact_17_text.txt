@@ -1,0 +1,7 @@
+Tired of getting sniped on bonding curves? 🐒
+
+Most Solana launches aren’t fair: MEV searchers bribe validators via Jito bundles to buy in slot 0, dump on retail, and leave you holding dust.
+
+$CHIMP is changing the game. 
+
+Here is Part 1 of how our Anti-MEV Fair Launch Engine works 🧵👇

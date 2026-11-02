@@ -1,0 +1,7 @@
+8/8
+True DeFi requires level playing fields. The $CHIMP Fair Launch proves you can launch high-velocity Solana assets without sacrificing fairness, security, or liquidity depth.
+
+Part 2 dropping soon: The Math of Pro-Rata Refunds & LP Lock Verification. 🍌🚀
+
+Code repo & docs: https://github.com/chimp-protocol/chimp-fair-launch
+cc @Solana @solana_devs #Solana #DeFi #Rust

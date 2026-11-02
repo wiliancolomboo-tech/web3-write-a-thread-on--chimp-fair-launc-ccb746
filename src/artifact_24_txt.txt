@@ -1,0 +1,5 @@
+How $CHIMP fixes fair discovery on @solana:
+
+⚡ 0-Slippage Proportional Allocation: Price is discovered dynamically over 43,200 slots. Transaction timing has ZERO impact on clearing rate.
+🛡️ Hardcoded Anchor PDA escrow guarantees no rug-pulls.
+🔥 Programmatic LP burn locked on-chain at finalization. [2/3]

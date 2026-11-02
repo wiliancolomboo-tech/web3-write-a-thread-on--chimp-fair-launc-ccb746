@@ -1,0 +1,2 @@
+> Tokens_Out = (Sol_In * Available) / (Target_SOL - Sol_Collected)
+>

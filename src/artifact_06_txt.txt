@@ -1,0 +1,5 @@
+services/watcher/
+├── package.json
+├── tsconfig.json
+└── src/
+    └── index.ts

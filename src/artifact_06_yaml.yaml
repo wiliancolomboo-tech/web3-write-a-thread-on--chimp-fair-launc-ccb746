@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  chimp-telemetry-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=ChimpLaunch111111111111111111111111111111111
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - VIP_ALERT_EMAIL=${VIP_ALERT_EMAIL}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

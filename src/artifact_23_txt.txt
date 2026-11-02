@@ -1,0 +1,5 @@
+Tired of getting dumped on in slot 0 by Jito bundles & private mempool snipers? 🛑
+
+Traditional Solana token launches are broken: bots extract liquidity before your wallet can even confirm a block.
+
+Enter the $CHIMP Fair Launch Engine: A masterclass in anti-MEV engineering. 🧵👇 [1/3]

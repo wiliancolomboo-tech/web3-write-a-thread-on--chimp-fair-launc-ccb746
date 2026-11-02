@@ -1,0 +1,107 @@
+{
+  "deliverable_id": "superteam_9b9a98ccb746",
+  "opportunity_id": "st-c7a39025-a619-405c-8f0f-ff5e1b34622e",
+  "platform": "SuperteamEarn",
+  "title": "Write a thread on $CHIMP Fair Launch - Part 1",
+  "url": "https://earn.superteam.fun/listings/bounty/chimp-on-metaplex",
+  "budget": "500 USDC",
+  "prize_amount": 500.0,
+  "ecosystem": "Solana",
+  "github_url": "https://github.com/wiliancolomboo-tech/web3-write-a-thread-on--chimp-fair-launc-ccb746",
+  "hf_space_url": null,
+  "status": "ready_for_submission",
+  "validation_reports": [
+    {
+      "file": "artifact_01_txt.txt",
+      "language": "txt",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_02_mermaid.txt",
+      "language": "mermaid",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_03_txt.txt",
+      "language": "txt",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_04_toml.toml",
+      "language": "toml",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_05_rust.rs",
+      "language": "rust",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_06_txt.txt",
+      "language": "txt",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_07_json.json",
+      "language": "json",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_08_json.json",
+      "language": "json",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_09_typescript.ts",
+      "language": "typescript",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_10_txt.txt",
+      "language": "txt",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_11_typescript.ts",
+      "language": "typescript",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_12_bash.sh",
+      "language": "bash",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_13_dockerfile.txt",
+      "language": "dockerfile",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_14_yaml.yaml",
+      "language": "yaml",
+      "valid": true,
+      "error": null
+    },
+    {
+      "file": "artifact_15_bash.sh",
+      "language": "bash",
+      "valid": true,
+      "error": null
+    }
+  ],
+  "git_initialized": true,
+  "created_at": "2026-11-02 23:49:09"
+}

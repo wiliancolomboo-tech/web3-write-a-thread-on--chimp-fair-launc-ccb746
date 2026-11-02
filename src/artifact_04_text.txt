@@ -1,0 +1,16 @@
+programs/chimp-fair-launch/
+├── Cargo.toml
+└── src/
+    ├── lib.rs
+    ├── errors.rs
+    ├── events.rs
+    ├── instructions/
+    │   ├── initialize.rs
+    │   ├── deposit.rs
+    │   ├── finalize.rs
+    │   ├── claim.rs
+    │   └── mod.rs
+    └── state/
+        ├── launch_pool.rs
+        ├── user_contribution.rs
+        └── mod.rs

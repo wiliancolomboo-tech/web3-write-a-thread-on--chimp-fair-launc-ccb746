@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  chimp-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=Ch1mpFa1rLaunch11111111111111111111111111111
+      - TOKEN_MINT=So11111111111111111111111111111111111111112
+      - SLACK_OR_DISCORD_WEBHOOK=${SLACK_OR_DISCORD_WEBHOOK}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - OPS_ADMIN_EMAIL=${OPS_ADMIN_EMAIL}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'console.log(process.uptime())'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

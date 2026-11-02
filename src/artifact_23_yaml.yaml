@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  chimp-launch-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}
+      - SOLANA_WS_URL=wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}
+      - PROGRAM_ID=ChimpFL1111111111111111111111111111111111111
+      - TOKEN_MINT=CHIMP11111111111111111111111111111111111111
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - CRANK_KEYPAIR_JSON=${CRANK_KEYPAIR_JSON}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

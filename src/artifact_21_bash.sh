@@ -1,0 +1,1 @@
+docker logs -f --tail 100 chimp-fair-launch-chimp-telemetry-daemon-1

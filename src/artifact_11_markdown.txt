@@ -1,0 +1,7 @@
+3/8
+$CHIMP fixes this at the consensus layer with an Epoch-Based Commit-Vault PDA.
+
+Instead of instant execution on an unprotected curve:
+1️⃣ Users deposit SOL into a non-custodial PDA over an $N$-slot window.
+2️⃣ Block speed doesn't matter.
+3️⃣ Zero priority fee or Jito bribery can grant a better price. 🛡️

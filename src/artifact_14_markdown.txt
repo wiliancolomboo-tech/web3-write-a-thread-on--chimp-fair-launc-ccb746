@@ -1,0 +1,7 @@
+6/8
+Trustless Liquidity Seeding:
+What happens to the raised capital?
+
+No developer multisig. The contract atomically initializes the Raydium liquidity pool, binds 80% of raised SOL, and immediately burns the LP tokens to address `1111...1111`.
+
+Mint authority is revoked forever in the same transaction. 🔒🔥

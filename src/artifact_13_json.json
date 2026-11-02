@@ -1,0 +1,21 @@
+{
+  "name": "chimp-fair-launch-daemon",
+  "version": "1.0.0",
+  "description": "Enterprise event listener and telemetry daemon for $CHIMP Fair Launch",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/web3.js": "^1.95.3",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "resend": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.4",
+    "typescript": "^5.5.4"
+  }
+}

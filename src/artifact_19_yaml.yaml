@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  chimp-keeper:
+    build: .
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=ChimpFL111111111111111111111111111111111111
+      - KEYPAIR_PATH=/secrets/keeper-keypair.json
+      - ENTERPRISE_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+    volumes:
+      - ./secrets:/secrets:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

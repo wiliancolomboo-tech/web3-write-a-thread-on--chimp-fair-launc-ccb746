@@ -1,0 +1,7 @@
+---
+
+# 5. Comprehensive Test Suite & QA Matrix
+
+Full integration test suite written with Anchor, Mocha, and Chai to ensure zero regressions, cryptographic correctness, and strict permission enforcement.
+
+### `tests/chimp-fair-launch.ts`

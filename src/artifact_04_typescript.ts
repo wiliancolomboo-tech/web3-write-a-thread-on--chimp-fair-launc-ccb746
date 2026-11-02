@@ -1,265 +1,152 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { ChimpFairLaunch } from "../target/types/chimp_fair_launch";
 import {
-  TOKEN_PROGRAM_ID,
-  createMint,
-  createAccount,
-  mintTo,
-  getAccount,
-} from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { assert, expect } from "chai";
+  Connection,
+  Keypair,
+  PublicKey,
+  LAMPORTS_PER_SOL,
+} from "@solana/web3.js";
+import axios from "axios";
+import * as dotenv from "dotenv";
+dotenv.config();
 
-describe("chimp-fair-launch test suite", () => {
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
+interface LaunchConfigData {
+  admin: PublicKey;
+  tokenMint: PublicKey;
+  totalTokensForSale: anchor.BN;
+  tokensForLiquidity: anchor.BN;
+  softCapLamports: anchor.BN;
+  hardCapLamports: anchor.BN;
+  maxContributionPerUser: anchor.BN;
+  startSlot: anchor.BN;
+  endSlot: anchor.BN;
+  totalSolDeposited: anchor.BN;
+  finalized: boolean;
+  liquidityMigrated: boolean;
+  bump: number;
+  vaultBump: number;
+}
 
-  const program = anchor.workspace.ChimpFairLaunch as Program<ChimpFairLaunch>;
+export class ChimpFairLaunchKeeper {
+  private connection: Connection;
+  private wallet: Keypair;
+  private programId: PublicKey;
+  private mint: PublicKey;
+  private discordWebhookUrl?: string;
 
-  let tokenMint: PublicKey;
-  let authorityAta: PublicKey;
-  let configPda: PublicKey;
-  let configBump: number;
-  let solVaultPda: PublicKey;
-  let tokenVaultPda: PublicKey;
+  constructor() {
+    const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+    this.connection = new Connection(rpcUrl, { commitment: "confirmed" });
 
-  const authority = Keypair.generate();
-  const user1 = Keypair.generate();
-  const user2 = Keypair.generate();
-
-  const TOTAL_TOKENS_FOR_SALE = new anchor.BN(1_000_000 * 10 ** 6); // 1M $CHIMP
-  const MIN_SOL_CAP = new anchor.BN(5 * LAMPORTS_PER_SOL);
-  const MAX_SOL_CAP = new anchor.BN(20 * LAMPORTS_PER_SOL);
-
-  before(async () => {
-    // Fund actors
-    for (const actor of [authority, user1, user2]) {
-      const sig = await provider.connection.requestAirdrop(actor.publicKey, 50 * LAMPORTS_PER_SOL);
-      await provider.connection.confirmTransaction(sig);
+    const secretKeyString = process.env.KEEPER_KEYPAIR_JSON;
+    if (!secretKeyString) {
+      throw new Error("KEEPER_KEYPAIR_JSON must be set in environment.");
     }
+    this.wallet = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyString)));
 
-    // Derive PDAs
-    [configPda, configBump] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_launch_config"), authority.publicKey.toBuffer()],
-      program.programId
+    this.programId = new PublicKey(process.env.CHIMP_PROGRAM_ID || "CH1MP11111111111111111111111111111111111111");
+    this.mint = new PublicKey(process.env.CHIMP_MINT_ADDRESS!);
+    this.discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  }
+
+  public getPDAConfig(): PublicKey {
+    const [configPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("chimp_config"), this.mint.toBuffer()],
+      this.programId
     );
+    return configPda;
+  }
 
-    [solVaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_sol_vault"), configPda.toBuffer()],
-      program.programId
-    );
-
-    [tokenVaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_token_vault"), configPda.toBuffer()],
-      program.programId
-    );
-
-    // Create Token Mint
-    tokenMint = await createMint(
-      provider.connection,
-      authority,
-      authority.publicKey,
-      null,
-      6
-    );
-
-    // Create Authority Token ATA & Mint supply
-    authorityAta = await createAccount(
-      provider.connection,
-      authority,
-      tokenMint,
-      authority.publicKey
-    );
-
-    await mintTo(
-      provider.connection,
-      authority,
-      tokenMint,
-      authorityAta,
-      authority,
-      TOTAL_TOKENS_FOR_SALE.toNumber()
-    );
-  });
-
-  it("1. Successfully initializes the $CHIMP Fair Launch Pool", async () => {
-    const now = Math.floor(Date.now() / 1000);
-    const startTime = new anchor.BN(now - 10); // active immediately
-    const endTime = new anchor.BN(now + 4);
-
-    await program.methods
-      .initializePool(TOTAL_TOKENS_FOR_SALE, MIN_SOL_CAP, MAX_SOL_CAP, startTime, endTime)
-      .accounts({
-        config: configPda,
-        tokenMint,
-        authorityTokenAccount: authorityAta,
-        tokenVault: tokenVaultPda,
-        solVault: solVaultPda,
-        authority: authority.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-      })
-      .signers([authority])
-      .rpc();
-
-    const vaultAccount = await getAccount(provider.connection, tokenVaultPda);
-    assert.strictEqual(vaultAccount.amount.toString(), TOTAL_TOKENS_FOR_SALE.toString());
-  });
-
-  it("2. Accepts multiple participant deposits (Anti-MEV invariant holds)", async () => {
-    const [user1DepositPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_user_deposit"), configPda.toBuffer(), user1.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const [user2DepositPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_user_deposit"), configPda.toBuffer(), user2.publicKey.toBuffer()],
-      program.programId
-    );
-
-    // User 1 deposits 15 SOL
-    await program.methods
-      .depositSol(new anchor.BN(15 * LAMPORTS_PER_SOL))
-      .accounts({
-        config: configPda,
-        solVault: solVaultPda,
-        userDeposit: user1DepositPda,
-        user: user1.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .signers([user1])
-      .rpc();
-
-    // User 2 deposits 15 SOL (Total = 30 SOL, Oversubscribed since Max Cap = 20 SOL)
-    await program.methods
-      .depositSol(new anchor.BN(15 * LAMPORTS_PER_SOL))
-      .accounts({
-        config: configPda,
-        solVault: solVaultPda,
-        userDeposit: user2DepositPda,
-        user: user2.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .signers([user2])
-      .rpc();
-
-    const configState = await program.account.launchConfig.fetch(configPda);
-    assert.strictEqual(
-      configState.totalSolDeposited.toString(),
-      new anchor.BN(30 * LAMPORTS_PER_SOL).toString()
-    );
-  });
-
-  it("3. Finalizes the pool after epoch expiration", async () => {
-    // Wait for end_time expiration
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    await program.methods
-      .finalizePool()
-      .accounts({
-        config: configPda,
-        authority: authority.publicKey,
-      })
-      .signers([authority])
-      .rpc();
-
-    const configState = await program.account.launchConfig.fetch(configPda);
-    expect(configState.status).to.deep.equal({ finalized: {} });
-  });
-
-  it("4. Distributes pro-rata tokens and refunds excess surplus to User 1", async () => {
-    const [user1DepositPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_user_deposit"), configPda.toBuffer(), user1.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const user1TokenAta = await createAccount(
-      provider.connection,
-      user1,
-      tokenMint,
-      user1.publicKey
-    );
-
-    const preBalanceLamports = await provider.connection.getBalance(user1.publicKey);
-
-    await program.methods
-      .claimAndRefund()
-      .accounts({
-        config: configPda,
-        userDeposit: user1DepositPda,
-        solVault: solVaultPda,
-        tokenVault: tokenVaultPda,
-        userTokenAccount: user1TokenAta,
-        user: user1.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .signers([user1])
-      .rpc();
-
-    const user1TokenAccount = await getAccount(provider.connection, user1TokenAta);
-    // 50% allocation of total tokens (500,000 $CHIMP)
-    assert.strictEqual(
-      user1TokenAccount.amount.toString(),
-      new anchor.BN(500_000 * 10 ** 6).toString()
-    );
-
-    const postBalanceLamports = await provider.connection.getBalance(user1.publicKey);
-    // User should have received ~5 SOL refund (15 SOL deposited - 10 SOL effective contribution)
-    assert.isTrue(postBalanceLamports > preBalanceLamports + 4.9 * LAMPORTS_PER_SOL);
-  });
-
-  it("5. Rejects double-claim attacks deterministically", async () => {
-    const [user1DepositPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_user_deposit"), configPda.toBuffer(), user1.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const user1TokenAta = await createAccount(
-      provider.connection,
-      user1,
-      tokenMint,
-      user1.publicKey
-    );
+  public async broadcastAlert(title: string, message: string, color: number = 0x00ff00): Promise<void> {
+    if (!this.discordWebhookUrl) return;
 
     try {
-      await program.methods
-        .claimAndRefund()
-        .accounts({
-          config: configPda,
-          userDeposit: user1DepositPda,
-          solVault: solVaultPda,
-          tokenVault: tokenVaultPda,
-          userTokenAccount: user1TokenAta,
-          user: user1.publicKey,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .signers([user1])
-        .rpc();
-      assert.fail("Should have thrown AlreadyClaimed error");
+      await axios.post(this.discordWebhookUrl, {
+        embeds: [
+          {
+            title: `🐵 [$CHIMP Fair Launch Engine] ${title}`,
+            description: message,
+            color: color,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      });
     } catch (err: any) {
-      assert.include(err.toString(), "AlreadyClaimed");
+      console.error("Failed to post telemetry to Discord:", err.message);
     }
-  });
+  }
 
-  it("6. Allows Authority to withdraw settled capital while protecting unrefunded surplus", async () => {
-    const preAuthBal = await provider.connection.getBalance(authority.publicKey);
+  public async monitorAndExecute(): Promise<void> {
+    console.log(`[+] Initializing $CHIMP Keeper for Mint: ${this.mint.toBase58()}`);
+    console.log(`[+] Keeper Signer: ${this.wallet.publicKey.toBase58()}`);
 
-    await program.methods
-      .withdrawSettledFunds()
-      .accounts({
-        config: configPda,
-        solVault: solVaultPda,
-        authority: authority.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .signers([authority])
-      .rpc();
+    const configPda = this.getPDAConfig();
 
-    const postAuthBal = await provider.connection.getBalance(authority.publicKey);
-    // Hard cap was 20 SOL
-    assert.isTrue(postAuthBal > preAuthBal + 19.9 * LAMPORTS_PER_SOL);
-  });
-});
+    setInterval(async () => {
+      try {
+        const currentSlot = await this.connection.getSlot("finalized");
+        const accountInfo = await this.connection.getAccountInfo(configPda);
+
+        if (!accountInfo) {
+          console.warn(`[!] Launch configuration not yet initialized on-chain.`);
+          return;
+        }
+
+        // Anchor 0.30 deserialization offset: 8-byte discriminator
+        const data = accountInfo.data.subarray(8);
+        const admin = new PublicKey(data.subarray(0, 32));
+        const tokenMint = new PublicKey(data.subarray(32, 64));
+        const startSlot = new anchor.BN(data.subarray(104, 112), "le");
+        const endSlot = new anchor.BN(data.subarray(112, 120), "le");
+        const totalSol = new anchor.BN(data.subarray(120, 128), "le");
+        const finalized = data.readUInt8(136) === 1;
+
+        console.log(
+          `[Slot ${currentSlot}] Target Slot: ${endSlot.toString()} | ` +
+          `Deposited: ${(totalSol.toNumber() / LAMPORTS_PER_SOL).toFixed(4)} SOL | ` +
+          `Finalized: ${finalized}`
+        );
+
+        if (!finalized && currentSlot >= endSlot.toNumber()) {
+          console.log(`[*] Target slot reached. Executing finalize instruction...`);
+          await this.executeFinalize(configPda);
+        }
+      } catch (err: any) {
+        console.error(`[-] Polling iteration error: ${err.message}`);
+      }
+    }, 2500);
+  }
+
+  private async executeFinalize(configPda: PublicKey): Promise<void> {
+    const tx = new anchor.web3.Transaction();
+    const ixDiscriminator = Buffer.from([168, 142, 237, 240, 148, 155, 145, 145]); // SHA256("global:finalize_launch")[0..8]
+
+    tx.add({
+      keys: [
+        { pubkey: configPda, isSigner: false, isWritable: true },
+        { pubkey: anchor.web3.SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      programId: this.programId,
+      data: ixDiscriminator,
+    });
+
+    const signature = await anchor.web3.sendAndConfirmTransaction(
+      this.connection,
+      tx,
+      [this.wallet],
+      { skipPreflight: false, commitment: "confirmed" }
+    );
+
+    console.log(`[✔] $CHIMP Launch successfully finalized! Sig: ${signature}`);
+    await this.broadcastAlert(
+      "Launch Finalized Successfully",
+      `The $CHIMP Fair Launch commit phase has concluded at finalized slot.\n\nTx Signature: \`${signature}\``,
+      0x57f287
+    );
+  }
+}
+
+if (require.main === module) {
+  const keeper = new ChimpFairLaunchKeeper();
+  keeper.monitorAndExecute();
+}

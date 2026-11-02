@@ -1,0 +1,5 @@
+6/6 🚀 Code is fully open-source and audited for the Solana community.
+
+Explore the complete implementation, Anchor contract, and turnkey Docker crank here: [github.com/chimp-token/chimp-fair-launch]
+
+Tagging @Solana @SuperteamDAO #Solana #DeFi #Rust

@@ -1,0 +1,29 @@
+import assert from "node:assert/strict";
+
+function proportional(numerator: bigint, multiplier: bigint, denominator: bigint): bigint {
+  if (denominator <= 0n) throw new Error("invalid denominator");
+  return (numerator * multiplier) / denominator;
+}
+
+const total = 1_000n;
+const cap = 500n;
+const supply = 10_000n;
+
+const alice = 600n;
+const bob = 400n;
+
+const aliceAccepted = proportional(alice, cap, total);
+const bobAccepted = proportional(bob, cap, total);
+
+assert.equal(aliceAccepted, 300n);
+assert.equal(bobAccepted, 200n);
+
+const aliceAllocation = proportional(aliceAccepted, supply, cap);
+const bobAllocation = proportional(bobAccepted, supply, cap);
+
+assert.equal(aliceAllocation, 6_000n);
+assert.equal(bobAllocation, 4_000n);
+
+assert.equal(alice - aliceAccepted, 300n);
+assert.equal(bob - bobAccepted, 200n);
+assert.equal(aliceAllocation + bobAllocation, supply);
