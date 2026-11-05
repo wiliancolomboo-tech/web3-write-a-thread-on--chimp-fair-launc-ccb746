@@ -1,16 +1,13 @@
-# 1. Build and verify deterministic BPF bytecode
+# 1. Build and verify Anchor smart contract
 anchor build
+anchor test
 
-# 2. Deploy to Solana Devnet / Mainnet-Beta
+# 2. Deploy program to Solana Devnet/Mainnet
 solana program deploy \
   --program-id target/deploy/chimp_fair_launch-keypair.json \
-  target/deploy/chimp_fair_launch.so \
-  --url https://api.devnet.solana.com
+  target/deploy/chimp_fair_launch.so
 
-# 3. Initialize the Launch Instance
-npm install
-npx ts-node client/init-pool.ts --mint <CHIMP_MINT_ADDRESS> --start-slot <DESIRED_SLOT>
-
-# 4. Spin up Turnkey Observability Microservices
-docker-compose up -d --build
-docker-compose logs -f
+# 3. Launch notification telemetry container
+cp .env.example .env
+docker compose up -d --build
+docker compose logs -f

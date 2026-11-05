@@ -1,19 +1,20 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  chimp-fair-launch-monitor:
+  chimp-keeper:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: chimp_pool_telemetry
-    restart: always
+    container_name: chimp-fair-launch-daemon
+    restart: unless-stopped
     environment:
       - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - KEYPAIR_PATH=/secrets/keeper-keypair.json
       - PROGRAM_ID=CH1MP11111111111111111111111111111111111111
-      - POOL_MINT=CHIMPq7wNfB2eYtqN9V4gA3aLwYpLw8E7sW8qZz2pump
-      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-      - RESEND_API_KEY=re_123456789
-      - ALERT_EMAIL=security@chimpresearch.io
+      - TOKEN_MINT=CHIMP7vXhU6q22f7cK45v8t5G2e9m8F3m9L2q8P1pump
+      - ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_TOKEN
+    volumes:
+      - ./secrets:/secrets:ro
     logging:
       driver: "json-file"
       options:

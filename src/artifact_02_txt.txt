@@ -1,26 +1,21 @@
 +---------------------------------------------------------------------------------+
-|                               Solana Mainnet-Beta                               |
-|                                                                                 |
-|  [Participant Wallets]               [CHIMP Fair Launch Anchor Program]         |
-|         │                                          │                            |
-|         ├─── (Deposit SOL) ──────────────────────> │ ──> [SOL Escrow PDA]       |
-|         ├─── (Claim $CHIMP / Refund) ────────────> │ <── [Token Escrow PDA]     |
-|                                                    │                            |
-+────────────────────────────────────────────────────┼────────────────────────────+
-                                                     │ (Program Events)
-                                                     ▼
+|                               Solana Blockchain                                 |
+|  +--------------------+      +--------------------+      +--------------------+ |
+|  | LaunchConfig PDA   |      | UserCommitment PDA |      | Vault Token ATA    | |
+|  +---------+----------+      +---------+----------+      +---------+----------+ |
++------------|---------------------------|---------------------------|------------+
+             |                           |                           |
+             | RPC WebSocket PubSub      | On-Chain Event Subscription
+             v                           v                           v
 +---------------------------------------------------------------------------------+
-|                       Off-Chain Automation Agent & Relayer                      |
-|                                                                                 |
-|   ┌───────────────────────┐   WebSocket/gRPC Stream   ┌──────────────────────┐  |
-|   │ Solana RPC Validator  │ ────────────────────────> │ CHIMP Event Listener │  |
-|   │ (Triton / Helius / Jito)│                         │ & Keeper Bot Engine  │  |
-|   └───────────────────────┘                           └──────────┬───────────┘  |
-|                                                                  │              |
-|                                            ┌─────────────────────┴──────────┐   |
-|                                            ▼                                ▼   |
-|                               ┌──────────────────────┐         ┌────────────┴─┐ |
-|                               │ Enterprise Webhooks  │         │  Prometheus  │ |
-|                               │ (Discord/Slack/Teams)│         │  Telemetry   │ |
-|                               └──────────────────────┘         └──────────────┘ |
+|                   Chimp Event Watcher & Crank Daemon (Node.js/TS)               |
+|  - Healthcheck Engine (/healthz, /metrics)                                      |
+|  - Auto-retry RPC cluster pool failover                                         |
+|  - Instant Webhook Dispatcher (HMAC-SHA256 authenticated)                       |
 +---------------------------------------------------------------------------------+
+             |                                           |
+             v                                           v
++---------------------------+               +---------------------------+
+| Enterprise Alerting       |               | Token Vesting Analytics   |
+| (Discord / Slack Webhook) |               | Dashboard & Archival DB   |
++---------------------------+               +---------------------------+

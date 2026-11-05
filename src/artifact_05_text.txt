@@ -1,6 +1,6 @@
-participant_allocation =
-    floor(
-        participant_deposit
-        × total_tokens_for_sale
-        ÷ total_eligible_deposits
-    )
+client/
+├── package.json
+├── tsconfig.json
+└── src/
+    ├── keeper.ts
+    └── notifier.ts

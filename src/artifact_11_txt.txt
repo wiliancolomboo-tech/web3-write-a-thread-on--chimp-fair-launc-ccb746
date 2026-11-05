@@ -1,8 +1,7 @@
-How does it work under the hood? 🛠️
+3/5 🛡️ Anti-Snipe Slot Protection:
 
-1/ Instead of bonding curves vulnerable to slippage manipulation, $CHIMP uses slot-bounded deposit escrow PDAs.
-2/ Mathematical price discovery: P = Total SOL Escrowed / $CHIMP Allocation.
-3/ Strict wallet caps enforce decentralization.
-4/ 100% of initial LP is permanently burned via PDA CPI graduation.
+During the first 150 slots (~60s), our on-chain program enforces a hard cap:
+No single wallet can acquire > 200 BPS (2%) of the initial supply.
 
-Clean Rust Anchor code with 0 stubs.
+Bundled atomic front-runs fail natively at runtime. 
+Snipers get reverted; authentic participants get filled.

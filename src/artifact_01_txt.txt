@@ -1,10 +1,10 @@
-+-----------------------------------------------------------------------------------+
-|                               Enterprise Impact Matrix                            |
-+-----------------------------------+-----------------------------------------------+
-| Vector                            | Metric / Impact                               |
-+-----------------------------------+-----------------------------------------------+
-| MEV / Sandwich Mitigation         | 100% immune during Capital Seeding Phase      |
-| Front-running Vector Surface      | 0% (Batch Pro-Rata Settlement)                |
-| Max Capital Concentration Per K   | Cryptographically capped per User PDA         |
-| Operational Latency               | Sub-second automated webhook dispatch         |
-+-----------------------------------+-----------------------------------------------+
+TRADITIONAL LAUNCH vs. $CHIMP FAIR LAUNCH
+┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
+│       Standard AMM / Pump Launch     │     │       $CHIMP Fair Launch Engine      │
+├──────────────────────────────────────┤     ├──────────────────────────────────────┤
+│ ❌ Jito MEV Bundle front-running     │     │ ✅ Sub-slot deterministic rate limit │
+│ ❌ Block-0 sniping & insider drain   │     │ ✅ Epoch-clearing uniform pricing    │
+│ ❌ Asymmetric information advantage │     │ ✅ Bounded contribution caps per PDA │
+│ ❌ Manual LP migration risk (Rug)    │     │ ✅ Automated, CPI-enforced LP Burn   │
+│ ❌ No audit trail or telemetry       │     │ ✅ Real-time enterprise webhook hook │
+└──────────────────────────────────────┘     └──────────────────────────────────────┘

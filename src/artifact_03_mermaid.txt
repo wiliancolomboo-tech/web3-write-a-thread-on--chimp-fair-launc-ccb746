@@ -1,26 +1,38 @@
-sequenceDiagram
-    autonumber
-    actor User as Contributor
-    participant CLI as Automation CLI / Web UI
-    participant Program as $CHIMP Fair Launch Program
-    participant Vault as Program Vault PDA
-    participant Webhook as Enterprise Webhook Service
-    participant DEX as External Notification Rails
+flowchart TD
+    subgraph Users ["Retail & Community Participants"]
+        U1["User Wallet A (SOL/USDC)"]
+        U2["User Wallet B (SOL/USDC)"]
+        U3["User Wallet C (SOL/USDC)"]
+    end
 
-    User->>Program: deposit_sol(amount)
-    Program->>Vault: Transfer SOL to PDA Vault
-    Program->>Program: Update ContributorRecord & Launch State
-    Program-->>CLI: Emit DepositEvent
-    CLI->>Webhook: Forward event payload
-    Webhook->>DEX: Dispatch Slack / Discord / Resend Alerts
+    subgraph Program ["Solana Runtime: $CHIMP Fair Launch Anchor Program"]
+        direction TB
+        PoolPDA["Pool State PDA\n(Seed: ['fair_launch', pool_id])"]
+        ChimpVault["$CHIMP Escrow Token Vault\n(Seed: ['token_vault', pool_id])"]
+        QuoteVault["Quote (WSOL/USDC) Vault\n(Seed: ['quote_vault', pool_id])"]
+        UserLedger["User Position Ledger PDA\n(Seed: ['user_state', pool_id, user_pubkey])"]
+        
+        PoolPDA --- ChimpVault
+        PoolPDA --- QuoteVault
+        PoolPDA --- UserLedger
+    end
 
-    Note over Program,Vault: Slots elapse until end_slot reached
+    subgraph Keeper ["Enterprise Off-Chain Automation & Observability Engine"]
+        Worker["Keeper Bot CLI / Cron Daemon"]
+        Discord["Discord / Slack Enterprise Webhook"]
+        HeliusRPC["Solana Geyser / Enterprise RPC (Helius/Triton)"]
+    end
 
-    User->>Program: finalize_launch()
-    Program->>Program: Calculate Uniform Clearing Price
-    Program-->>CLI: Emit FinalizeEvent
+    U1 -->|1. deposit()| Program
+    U2 -->|1. deposit()| Program
+    U3 -->|1. deposit()| Program
 
-    User->>Program: claim_tokens_and_refund()
-    Program->>User: Transfer pro-rata $CHIMP Tokens
-    Program->>User: Transfer excess SOL (if over hard cap)
-    Program-->>CLI: Emit ClaimEvent
+    Worker -->|2. Monitor Clock & Pool Caps| HeliusRPC
+    HeliusRPC -->|3. Account Notifications (WebSocket)| Worker
+    Worker -->|4. finalize_pool() once end_slot reached| Program
+    
+    Program -->|5. Settle Clearing Price| PoolPDA
+    U1 -->|6. claim_tokens()| ChimpVault
+    U2 -->|6. claim_tokens()| ChimpVault
+    
+    Worker -->|7. Post-Launch Telemetry Alert| Discord

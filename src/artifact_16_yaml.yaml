@@ -1,25 +1,23 @@
 version: "3.8"
 
 services:
-  chimp-daemon:
+  chimp-keeper:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: chimp_fair_launch_daemon
+    container_name: chimp_fair_launch_keeper
     restart: always
     environment:
-      - RPC_URL=https://api.mainnet-beta.solana.com
-      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-      - SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-      - POOL_PUBKEY=CHMPf41rLaunchEngine1111111111111111111111
-      - KEYPAIR_PATH=/etc/solana/id.json
-      - PORT=8080
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - CHIMP_PROGRAM_ID=CHMP1auncH111111111111111111111111111111111
+      - TOKEN_MINT=CHMPxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      - KEEPER_KEYPAIR_PATH=/secrets/keeper-keypair.json
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your/webhook/here
+      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/here
     volumes:
-      - ./secrets/id.json:/etc/solana/id.json:ro
-    ports:
-      - "8080:8080"
+      - ./secrets:/secrets:ro
     logging:
       driver: "json-file"
       options:
-        max-size: "50m"
+        max-size: "20m"
         max-file: "5"

@@ -10,7 +10,7 @@ services:
     environment:
       - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
       - POOL_STATE_ADDRESS=Ch1mpFa1rLaunch11111111111111111111111111111
-      - RESEND_API_KEY=re_live_chimp_production_key_here
+      - RESEND_API_KEY=re_test_000000000000000000000000
       - SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
       - OPS_ALERT_EMAIL=security@chimptoken.io
     logging:

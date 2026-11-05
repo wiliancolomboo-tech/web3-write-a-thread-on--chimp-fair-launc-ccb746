@@ -1,22 +1,21 @@
 {
-  "name": "chimp-fair-launch-watcher",
+  "name": "chimp-fairlaunch-client",
   "version": "1.0.0",
-  "description": "Production Agent Worker & Enterprise Alerting for $CHIMP Launch",
+  "description": "Enterprise Keeper & Telemetry Bot for $CHIMP Fair Launch",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "start": "node dist/index.js"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.30.1",
-    "@solana/web3.js": "^1.95.3",
-    "axios": "^1.7.7",
+    "@coral-xyz/anchor": "^0.29.0",
+    "@solana/web3.js": "^1.91.0",
+    "@solana/spl-token": "^0.4.0",
+    "axios": "^1.6.8",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
-    "@types/node": "^22.5.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.2"
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
   }
 }

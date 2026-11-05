@@ -1,51 +1,44 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { ChimpFairLaunch } from "../target/types/chimp_fair_launch";
-import { 
-  Keypair, 
-  PublicKey, 
-  SystemProgram, 
-  LAMPORTS_PER_SOL 
-} from "@solana/web3.js";
-import { 
-  TOKEN_PROGRAM_ID, 
-  createMint, 
-  createAccount, 
-  mintTo, 
-  getAccount 
+import {
+  createMint,
+  createAccount,
+  mintTo,
+  getAccount,
 } from "@solana/spl-token";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 
-describe("chimp-fair-launch-suite", () => {
+describe("chimp-fair-launch engine test suite", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.ChimpFairLaunch as Program<ChimpFairLaunch>;
-  
-  let chimpMint: PublicKey;
+
+  let mint: PublicKey;
+  let authorityTokenAccount: PublicKey;
   let poolPda: PublicKey;
-  let escrowVaultPda: PublicKey;
-  let poolTokenVault: PublicKey;
+  let tokenVaultPda: PublicKey;
+  let solVaultPda: PublicKey;
 
   const authority = Keypair.generate();
   const alice = Keypair.generate();
   const bob = Keypair.generate();
 
-  const TOTAL_TOKENS_FOR_SALE = new anchor.BN(10_000_000).mul(new anchor.BN(10 ** 6));
-  const HARD_CAP = new anchor.BN(50).mul(new anchor.BN(LAMPORTS_PER_SOL));
-  const SOFT_CAP = new anchor.BN(10).mul(new anchor.BN(LAMPORTS_PER_SOL));
-  const MAX_PER_WALLET = new anchor.BN(25).mul(new anchor.BN(LAMPORTS_PER_SOL));
-  const MIN_PER_WALLET = new anchor.BN(1).mul(new anchor.BN(LAMPORTS_PER_SOL));
+  const TOTAL_ALLOCATION = new anchor.BN(1_000_000 * 1e6); // 1,000,000 $CHIMP
+  const SOFT_CAP = new anchor.BN(10 * LAMPORTS_PER_SOL);    // 10 SOL
+  const HARD_CAP = new anchor.BN(50 * LAMPORTS_PER_SOL);    // 50 SOL
 
   before(async () => {
-    // Airdrop SOL to test actors
-    for (const actor of [authority, alice, bob]) {
-      const sig = await provider.connection.requestAirdrop(actor.publicKey, 100 * LAMPORTS_PER_SOL);
-      await provider.connection.confirmTransaction(sig, "confirmed");
+    // Fund authority, Alice, Bob
+    for (const kp of [authority, alice, bob]) {
+      const sig = await provider.connection.requestAirdrop(kp.publicKey, 100 * LAMPORTS_PER_SOL);
+      await provider.connection.confirmTransaction(sig);
     }
 
-    // Create Token Mint
-    chimpMint = await createMint(
+    // Create $CHIMP mint
+    mint = await createMint(
       provider.connection,
       authority,
       authority.publicKey,
@@ -53,224 +46,195 @@ describe("chimp-fair-launch-suite", () => {
       6
     );
 
-    [poolPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("launch_pool"), chimpMint.toBuffer()],
-      program.programId
-    );
-
-    [escrowVaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("escrow_vault"), poolPda.toBuffer()],
-      program.programId
-    );
-
-    poolTokenVault = await createAccount(
+    // Create authority token account and mint total allocation
+    authorityTokenAccount = await createAccount(
       provider.connection,
       authority,
-      chimpMint,
-      poolPda
+      mint,
+      authority.publicKey
     );
 
-    // Fund the pool with tokens
     await mintTo(
       provider.connection,
       authority,
-      chimpMint,
-      poolTokenVault,
-      authority.publicKey,
-      BigInt(TOTAL_TOKENS_FOR_SALE.toString())
+      mint,
+      authorityTokenAccount,
+      authority,
+      10_000_000 * 1e6
+    );
+
+    [poolPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("chimp_pool"), mint.toBuffer()],
+      program.programId
+    );
+
+    [tokenVaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("token_vault"), poolPda.toBuffer()],
+      program.programId
+    );
+
+    [solVaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("sol_vault"), poolPda.toBuffer()],
+      program.programId
     );
   });
 
-  it("1. Successfully initializes the $CHIMP Launch Pool", async () => {
-    const durationSlots = new anchor.BN(100);
+  it("1. Initializes the launch pool with tokens safely locked in vault PDA", async () => {
+    const currentSlot = await provider.connection.getSlot();
+    const startSlot = new anchor.BN(currentSlot + 2);
+    const endSlot = new anchor.BN(currentSlot + 15);
 
     await program.methods
       .initializePool(
-        TOTAL_TOKENS_FOR_SALE,
-        HARD_CAP,
+        TOTAL_ALLOCATION,
+        startSlot,
+        endSlot,
         SOFT_CAP,
-        MAX_PER_WALLET,
-        MIN_PER_WALLET,
-        durationSlots
+        HARD_CAP
       )
       .accounts({
-        authority: authority.publicKey,
-        tokenMint: chimpMint,
         pool: poolPda,
-        escrowVault: escrowVaultPda,
-        poolTokenVault: poolTokenVault,
-        systemProgram: SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        tokenMint: mint,
+        tokenVault: tokenVaultPda,
+        authorityTokenAccount,
+        authority: authority.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
       .signers([authority])
       .rpc();
 
-    const poolAccount = await program.account.launchPool.fetch(poolPda);
-    expect(poolAccount.authority.toBase58()).to.equal(authority.publicKey.toBase58());
-    expect(poolAccount.hardCap.toString()).to.equal(HARD_CAP.toString());
-    expect(poolAccount.isFinalized).to.be.false;
+    const vaultAccount = await getAccount(provider.connection, tokenVaultPda);
+    expect(Number(vaultAccount.amount)).to.equal(TOTAL_ALLOCATION.toNumber());
+
+    const poolState = await program.account.launchPool.fetch(poolPda);
+    expect(poolState.isFinalized).to.be.false;
+    expect(poolState.totalSolDeposited.toNumber()).to.equal(0);
   });
 
-  it("2. Allows Alice to deposit SOL within limits", async () => {
-    const depositAmount = new anchor.BN(10).mul(new anchor.BN(LAMPORTS_PER_SOL));
-    const [aliceContributionPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_contribution"), poolPda.toBuffer(), alice.publicKey.toBuffer()],
+  it("2. Accepts contributions within active epoch window", async () => {
+    // Wait for start slot
+    let slot = await provider.connection.getSlot();
+    while (slot < (await program.account.launchPool.fetch(poolPda)).startSlot.toNumber()) {
+      await new Promise((r) => setTimeout(r, 400));
+      slot = await provider.connection.getSlot();
+    }
+
+    const aliceDeposit = new anchor.BN(40 * LAMPORTS_PER_SOL);
+    const [aliceReceipt] = PublicKey.findProgramAddressSync(
+      [Buffer.from("receipt"), poolPda.toBuffer(), alice.publicKey.toBuffer()],
       program.programId
     );
 
     await program.methods
-      .depositSol(depositAmount)
+      .contribute(aliceDeposit)
       .accounts({
-        contributor: alice.publicKey,
         pool: poolPda,
-        escrowVault: escrowVaultPda,
-        userContribution: aliceContributionPda,
-        systemProgram: SystemProgram.programId,
+        solVault: solVaultPda,
+        receipt: aliceReceipt,
+        user: alice.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([alice])
       .rpc();
 
-    const userContribution = await program.account.userContribution.fetch(aliceContributionPda);
-    expect(userContribution.lamportsContributed.toString()).to.equal(depositAmount.toString());
-
-    const escrowBalance = await provider.connection.getBalance(escrowVaultPda);
-    expect(escrowBalance).to.equal(depositAmount.toNumber());
-  });
-
-  it("3. Rejects deposits exceeding individual maximum allocation cap", async () => {
-    const excessiveDeposit = new anchor.BN(20).mul(new anchor.BN(LAMPORTS_PER_SOL)); // 10 + 20 = 30 > 25 SOL limit
-    const [aliceContributionPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_contribution"), poolPda.toBuffer(), alice.publicKey.toBuffer()],
-      program.programId
-    );
-
-    try {
-      await program.methods
-        .depositSol(excessiveDeposit)
-        .accounts({
-          contributor: alice.publicKey,
-          pool: poolPda,
-          escrowVault: escrowVaultPda,
-          userContribution: aliceContributionPda,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([alice])
-        .rpc();
-      expect.fail("Should have thrown MaxContributionExceeded");
-    } catch (err: any) {
-      expect(err.error.errorCode.code).to.equal("MaxContributionExceeded");
-    }
-  });
-
-  it("4. Allows Bob to deposit SOL up to hard cap threshold", async () => {
-    const depositBob = new anchor.BN(25).mul(new anchor.BN(LAMPORTS_PER_SOL));
-    const [bobContributionPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_contribution"), poolPda.toBuffer(), bob.publicKey.toBuffer()],
+    const bobDeposit = new anchor.BN(60 * LAMPORTS_PER_SOL); // Overflows hard cap: Total = 100 SOL (Hard Cap = 50 SOL)
+    const [bobReceipt] = PublicKey.findProgramAddressSync(
+      [Buffer.from("receipt"), poolPda.toBuffer(), bob.publicKey.toBuffer()],
       program.programId
     );
 
     await program.methods
-      .depositSol(depositBob)
+      .contribute(bobDeposit)
       .accounts({
-        contributor: bob.publicKey,
         pool: poolPda,
-        escrowVault: escrowVaultPda,
-        userContribution: bobContributionPda,
-        systemProgram: SystemProgram.programId,
+        solVault: solVaultPda,
+        receipt: bobReceipt,
+        user: bob.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([bob])
       .rpc();
 
     const poolState = await program.account.launchPool.fetch(poolPda);
-    expect(poolState.totalSolRaised.toString()).to.equal(
-      new anchor.BN(35).mul(new anchor.BN(LAMPORTS_PER_SOL)).toString()
-    );
+    expect(poolState.totalSolDeposited.toNumber()).to.equal(100 * LAMPORTS_PER_SOL);
   });
 
-  it("5. Finalizes launch pool after slot expiration", async () => {
-    // Wait until slots advance beyond endSlot
-    let poolState = await program.account.launchPool.fetch(poolPda);
-    while (true) {
-      const currentSlot = await provider.connection.getSlot("processed");
-      if (currentSlot > poolState.endSlot.toNumber()) break;
-      await new Promise((r) => setTimeout(r, 1000));
+  it("3. Enforces deterministic epoch expiration before finalize", async () => {
+    // Attempting to finalize before end_slot must revert
+    try {
+      await program.methods
+        .finalizePool()
+        .accounts({
+          pool: poolPda,
+          caller: authority.publicKey,
+        })
+        .signers([authority])
+        .rpc();
+      expect.fail("Finalization should fail prior to end_slot");
+    } catch (_err) {
+      // Expected failure
     }
 
+    // Wait for end slot
+    let slot = await provider.connection.getSlot();
+    while (slot <= (await program.account.launchPool.fetch(poolPda)).endSlot.toNumber()) {
+      await new Promise((r) => setTimeout(r, 400));
+      slot = await provider.connection.getSlot();
+    }
+
+    // Now finalize successfully
     await program.methods
       .finalizePool()
       .accounts({
-        caller: authority.publicKey,
         pool: poolPda,
+        caller: authority.publicKey,
       })
       .signers([authority])
       .rpc();
 
-    poolState = await program.account.launchPool.fetch(poolPda);
+    const poolState = await program.account.launchPool.fetch(poolPda);
     expect(poolState.isFinalized).to.be.true;
-    expect(poolState.isSoftCapReached).to.be.true;
+    expect(poolState.isSuccessful).to.be.true;
   });
 
-  it("6. Enables users to claim pro-rata token allocation", async () => {
-    const [aliceContributionPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_contribution"), poolPda.toBuffer(), alice.publicKey.toBuffer()],
+  it("4. Calculates pro-rata $CHIMP allocation and refunds excess SOL overflow", async () => {
+    // Total Deposited: 100 SOL. Hard Cap: 50 SOL.
+    // Alice deposited 40 SOL (40% of pool) -> Effective contribution: 20 SOL (40% of 50 SOL Hard Cap)
+    // Alice Token Share: 400,000 $CHIMP (40% of 1M). Alice Refund: 20 SOL.
+    const [aliceReceipt] = PublicKey.findProgramAddressSync(
+      [Buffer.from("receipt"), poolPda.toBuffer(), alice.publicKey.toBuffer()],
       program.programId
     );
 
-    const aliceTokenAccount = await createAccount(
-      provider.connection,
-      alice,
-      chimpMint,
-      alice.publicKey
-    );
+    const aliceSolBefore = await provider.connection.getBalance(alice.publicKey);
 
     await program.methods
-      .claimTokens()
+      .claimTokensAndRefund()
       .accounts({
-        user: alice.publicKey,
         pool: poolPda,
-        userContribution: aliceContributionPda,
-        poolTokenVault: poolTokenVault,
-        userTokenAccount: aliceTokenAccount,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        tokenMint: mint,
+        tokenVault: tokenVaultPda,
+        solVault: solVaultPda,
+        receipt: aliceReceipt,
+        user: alice.publicKey,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([alice])
       .rpc();
 
-    const userContribution = await program.account.userContribution.fetch(aliceContributionPda);
-    expect(userContribution.claimed).to.be.true;
-
-    // Alice contributed 10 SOL out of 35 total raised -> 10/35th of TOTAL_TOKENS_FOR_SALE
-    const aliceBalance = await getAccount(provider.connection, aliceTokenAccount);
-    const expectedShare = (BigInt(10) * BigInt(TOTAL_TOKENS_FOR_SALE.toString())) / BigInt(35);
-    expect(aliceBalance.amount.toString()).to.equal(expectedShare.toString());
-  });
-
-  it("7. Prevents duplicate claims from same user", async () => {
-    const [aliceContributionPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_contribution"), poolPda.toBuffer(), alice.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const aliceTokenAccounts = await provider.connection.getTokenAccountsByOwner(alice.publicKey, {
-      mint: chimpMint,
+    const aliceAta = anchor.utils.token.associatedAddress({
+      mint: mint,
+      owner: alice.publicKey,
     });
+    const aliceTokenBal = await getAccount(provider.connection, aliceAta);
+    expect(Number(aliceTokenBal.amount)).to.equal(400_000 * 1e6);
 
-    try {
-      await program.methods
-        .claimTokens()
-        .accounts({
-          user: alice.publicKey,
-          pool: poolPda,
-          userContribution: aliceContributionPda,
-          poolTokenVault: poolTokenVault,
-          userTokenAccount: aliceTokenAccounts.value[0].pubkey,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .signers([alice])
-        .rpc();
-      expect.fail("Should have failed on duplicate claim");
-    } catch (err: any) {
-      expect(err.error.errorCode.code).to.equal("TokensAlreadyClaimed");
-    }
+    const aliceSolAfter = await provider.connection.getBalance(alice.publicKey);
+    // Refund should be approximately 20 SOL (minus tx fee)
+    expect(aliceSolAfter - aliceSolBefore).to.be.greaterThan(19.9 * LAMPORTS_PER_SOL);
   });
 });

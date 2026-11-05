@@ -1,4 +1,4 @@
-services/watcher/
+client/
 ├── package.json
 ├── tsconfig.json
 └── src/

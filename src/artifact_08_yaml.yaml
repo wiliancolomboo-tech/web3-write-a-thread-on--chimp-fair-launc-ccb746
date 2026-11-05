@@ -1,19 +1,23 @@
 version: "3.8"
 
 services:
-  chimp-keeper:
+  chimp-sentinel:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: chimp-fair-launch-sentinel
     restart: always
+    ports:
+      - "8080:8080"
     environment:
+      - PORT=8080
       - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - CHIMP_PROGRAM_ID=CH1MP11111111111111111111111111111111111111
-      - CHIMP_MINT_ADDRESS=Ch1mpTokenMintAddressHere111111111111111111
-      - KEEPER_KEYPAIR_JSON=${KEEPER_KEYPAIR_JSON}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - SOLANA_WS_URL=wss://api.mainnet-beta.solana.com
+      - PROGRAM_ID=Chimp11111111111111111111111111111111111111
+      - TOKEN_MINT=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-webhook-id/token
     logging:
       driver: "json-file"
       options:
-        max-size: "50m"
+        max-size: "20m"
         max-file: "5"

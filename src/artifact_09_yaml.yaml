@@ -1,20 +1,25 @@
-version: "3.9"
+version: "3.8"
 
 services:
-  chimp-keeper:
+  chimp-crank-monitor:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: unless-stopped
+    container_name: chimp-crank-monitor
+    restart: always
     environment:
       - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - PROGRAM_ID=ChimpFL1111111111111111111111111111111111111
-      - CHIMP_TOKEN_MINT=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
-      - KEEPER_KEYPAIR_JSON=${KEEPER_KEYPAIR_JSON}
-      - ENTERPRISE_WEBHOOK_URL=${ENTERPRISE_WEBHOOK_URL}
-      - PORT=8080
-    ports:
-      - "8080:8080"
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/dummy/chimp-alerts
+      - RESEND_API_KEY=re_dummy123456789
+      - RESEND_ALERT_EMAIL=ops@chimp.money
+      - KEYPAIR_PATH=/secrets/id.json
+    volumes:
+      - ./secrets:/secrets:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     logging:
       driver: "json-file"
       options:

@@ -1,6 +1,31 @@
-2/8
-Traditional AMM launches are mathematically broken for retail. 
+🧵 1/3
+Why are 99% of Solana memecoin & token launches rigged against retail?
 
-When a pool opens at Block N, high-frequency bot bundles bid hundreds of SOL in tips to take the first 4 slots of the block.
+Jito bundle snipers, sandwich MEV, and slot-0 front-running drain capital before ordinary users even confirm a tx.
 
-By Block N+1, retail is buying at an 800% premium. That is not a fair launch; it is a liquidity exit trap. 📉
+Meet $CHIMP Fair Launch: A deterministic, epoch-based batch auction built on @Solana. 🍌⚡👇
+
+---
+
+🧵 2/3
+The Math & Architecture:
+
+Instead of a vulnerable CP-AMM where bots bribe validators for priority blocks, $CHIMP uses an on-chain proportional accumulation pool:
+
+1️⃣ Zero-MEV Window: Users commit SOL over fixed epochs ($T_0 \to T_1$).
+2️⃣ Uniform Clearing: $P_{clearing} = \frac{\sum SOL}{TotalTokens}$. Everyone gets the exact same price.
+3️⃣ Autonomous AMM Seeding: At epoch conclusion, protocol-owned liquidity is locked atomically.
+
+Zero sandwiching. Zero sniper advantage. Pure mathematical fairness. 🛡️🦀
+
+---
+
+🧵 3/3
+We've engineered the complete production engine:
+✅ Auditable Anchor Rust Program with strict PDA escrow invariants
+✅ Automated Keeper Daemon with real-time enterprise telemetry
+✅ 100% passing QA integration test suite
+
+Check out the architecture & repo: github.com/chimp-protocol/fair-launch
+
+Part 2 dropping soon on dynamic vesting & Meteora DLMM pool bonding! 🔥

@@ -1,9 +1,3 @@
-# Build binary
-anchor build
-
-# Deploy to Solana Devnet or Mainnet-Beta
-solana program deploy \
-  --program-id CHMPf1rLaunch1111111111111111111111111111111 \
-  target/deploy/chimp_fair_launch.so \
-  --url mainnet-beta \
-  --keypair ./secrets/deployer-keypair.json
+curl -I http://localhost:8080/health
+  # Returns: HTTP/1.1 200 OK
+  # Payload: {"status":"UP","active_slot":248921021,"connected_clients":1}

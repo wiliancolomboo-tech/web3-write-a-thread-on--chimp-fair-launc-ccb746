@@ -1,108 +1,123 @@
-// scripts/auction-orchestrator.ts
 import * as anchor from "@coral-xyz/anchor";
-import { Program, web3 } from "@coral-xyz/anchor";
-import { PublicKey, Keypair, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction } from "@solana/spl-token";
+import { Program } from "@coral-xyz/anchor";
+import { PublicKey, Keypair, Connection, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import axios from "axios";
-import { Resend } from "resend";
-import * as fs from "fs";
+import * as dotenv from "dotenv";
 
-interface OrchestratorConfig {
-    rpcUrl: string;
-    wsUrl: string;
-    programId: string;
-    tokenMint: string;
-    keypairPath: string;
-    discordWebhookUrl: string;
-    resendApiKey: string;
-    alertEmail: string;
+dotenv.config();
+
+const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID || "CH1MPy8vD3mN1A3vQGZ8r6gK2T3Lq6mZ7dE1h5J9XYZ");
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
+const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || clusterApiUrl("devnet");
+
+export interface LaunchMetrics {
+  poolAddress: string;
+  totalSolDeposited: number;
+  hardCap: number;
+  percentageFilled: number;
+  isFinalized: boolean;
+  timeRemainingSeconds: number;
 }
 
-export class ChimpFairLaunchAgent {
-    private connection: Connection;
-    private wallet: anchor.Wallet;
-    private program: Program;
-    private resend: Resend;
-    private config: OrchestratorConfig;
+export class ChimpTelemetryService {
+  private connection: Connection;
+  private wallet: anchor.Wallet;
+  private provider: anchor.AnchorProvider;
 
-    constructor(config: OrchestratorConfig) {
-        this.config = config;
-        this.connection = new Connection(config.rpcUrl, {
-            wsEndpoint: config.wsUrl,
-            commitment: "confirmed",
-        });
+  constructor(keypair: Keypair) {
+    this.connection = new Connection(RPC_ENDPOINT, "confirmed");
+    this.wallet = new anchor.Wallet(keypair);
+    this.provider = new anchor.AnchorProvider(this.connection, this.wallet, {
+      commitment: "confirmed",
+    });
+  }
 
-        const keypairRaw = JSON.parse(fs.readFileSync(config.keypairPath, "utf-8"));
-        const payerKeypair = Keypair.fromSecretKey(new Uint8Array(keypairRaw));
-        this.wallet = new anchor.Wallet(payerKeypair);
+  public async broadcastAlert(title: string, metrics: LaunchMetrics): Promise<void> {
+    const payload = {
+      username: "$CHIMP Fair Launch Monitor",
+      embeds: [
+        {
+          title: `🚀 ${title}`,
+          color: 0x00ff88,
+          fields: [
+            { name: "Pool Address", value: `\`${metrics.poolAddress}\``, inline: false },
+            { name: "Total SOL Deposited", value: `${metrics.totalSolDeposited.toFixed(2)} SOL`, inline: true },
+            { name: "Hard Cap", value: `${metrics.hardCap.toFixed(2)} SOL`, inline: true },
+            { name: "Saturation", value: `${metrics.percentageFilled.toFixed(2)}%`, inline: true },
+            { name: "Status", value: metrics.isFinalized ? "Finalized / Settleable" : "Deposit Epoch Open", inline: true },
+            { name: "Time Left", value: `${Math.max(0, metrics.timeRemainingSeconds)}s`, inline: true },
+          ],
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
 
-        const provider = new anchor.AnchorProvider(this.connection, this.wallet, {
-            preflightCommitment: "confirmed",
-        });
-
-        const idl = JSON.parse(fs.readFileSync("./target/idl/chimp_fair_launch.json", "utf-8"));
-        this.program = new Program(idl, provider);
-        this.resend = new Resend(config.resendApiKey);
+    if (DISCORD_WEBHOOK_URL) {
+      try {
+        await axios.post(DISCORD_WEBHOOK_URL, payload);
+      } catch (err: any) {
+        console.error("Discord alert dispatch error:", err.message);
+      }
     }
 
-    public async runDaemon(): Promise<void> {
-        console.log("[AGENT] Starting $CHIMP Fair Launch Monitor Daemon...");
-        const mintPubkey = new PublicKey(this.config.tokenMint);
-        const [launchConfigPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("launch_config"), mintPubkey.toBuffer()],
-            this.program.programId
-        );
-
-        console.log(`[AGENT] Listening on LaunchConfig PDA: ${launchConfigPda.toBase58()}`);
-
-        setInterval(async () => {
-            try {
-                const configAccount: any = await this.program.account.launchConfig.fetch(launchConfigPda);
-                const currentSlot = await this.connection.getSlot("confirmed");
-
-                console.log(`[SLOT] Current: ${currentSlot} | End: ${configAccount.endSlot.toNumber()} | Settled: ${configAccount.isFinalized}`);
-
-                if (currentSlot > configAccount.endSlot.toNumber() && !configAccount.isFinalized) {
-                    console.log("[AUCTION] End slot passed. Executing permissionless finalization...");
-                    await this.executeFinalization(mintPubkey, launchConfigPda, configAccount);
-                }
-            } catch (err) {
-                console.error("[MONITOR_ERROR]", err);
-            }
-        }, 4000);
+    if (SLACK_WEBHOOK_URL) {
+      try {
+        await axios.post(SLACK_WEBHOOK_URL, {
+          text: `*$CHIMP Fair Launch Alert:* ${title}\nDeposited: ${metrics.totalSolDeposited} SOL / ${metrics.hardCap} SOL (${metrics.percentageFilled.toFixed(1)}%)`,
+        });
+      } catch (err: any) {
+        console.error("Slack alert dispatch error:", err.message);
+      }
     }
+  }
 
-    private async executeFinalization(mint: PublicKey, launchConfigPda: PublicKey, configAccount: any): Promise<void> {
-        try {
-            const tx = await this.program.methods
-                .finalize()
-                .accounts({
-                    caller: this.wallet.publicKey,
-                    launchConfig: launchConfigPda,
-                })
-                .rpc();
+  public async monitorLaunch(tokenMint: PublicKey, idl: any): Promise<void> {
+    const program = new Program(idl, this.provider);
+    const [configPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("launch_config"), tokenMint.toBuffer()],
+      PROGRAM_ID
+    );
 
-            const postAccount: any = await this.program.account.launchConfig.fetch(launchConfigPda);
-            const totalSolRaised = (postAccount.totalSolDeposited.toNumber() / LAMPORTS_PER_SOL).toFixed(4);
-            const priceScaled = postAccount.finalSettlementPriceScaled.toString();
+    console.log(`[DAEMON] Monitoring $CHIMP Launch at PDA: ${configPda.toBase58()}`);
 
-            const message = `🚀 **$CHIMP Fair Launch Finalized Successfully!**\n- **Tx:** \`${tx}\`\n- **Total Raised:** \`${totalSolRaised} SOL\`\n- **Settlement Rate (Scaled 1e9):** \`${priceScaled}\``;
+    setInterval(async () => {
+      try {
+        const configAccount: any = await program.account.launchConfig.fetch(configPda);
+        const now = Math.floor(Date.now() / 1000);
+        const totalSol = configAccount.totalSolDeposited.toNumber() / LAMPORTS_PER_SOL;
+        const hardCap = configAccount.hardCapLamports.toNumber() / LAMPORTS_PER_SOL;
+        const remaining = configAccount.endTime.toNumber() - now;
+        const pct = (totalSol / hardCap) * 100;
 
-            console.log(message);
+        const metrics: LaunchMetrics = {
+          poolAddress: configPda.toBase58(),
+          totalSolDeposited: totalSol,
+          hardCap,
+          percentageFilled: pct,
+          isFinalized: configAccount.isFinalized,
+          timeRemainingSeconds: remaining,
+        };
 
-            // Enterprise Webhook Notification
-            await axios.post(this.config.discordWebhookUrl, { content: message });
+        console.log(`[POLL] Deposited: ${totalSol} SOL | Cap: ${hardCap} SOL | Remaining: ${remaining}s`);
 
-            // Institutional Syndicate Email Dispatch
-            await this.resend.emails.send({
-                from: "onboarding@resend.dev",
-                to: this.config.alertEmail,
-                subject: "$CHIMP Fair Launch Settlement Alert",
-                html: `<h1>$CHIMP Auction Finalized</h1><p>${message}</p>`,
-            });
+        // Trigger auto-finalization if conditions are met
+        if (!configAccount.isFinalized && (remaining <= 0 || pct >= 100)) {
+          console.log("[CRON] Window expired or Cap met. Executing finalize_launch CPI...");
+          const tx = await program.methods
+            .finalizeLaunch()
+            .accounts({
+              admin: this.wallet.publicKey,
+              launchConfig: configPda,
+            })
+            .rpc();
 
-        } catch (error: any) {
-            console.error("[FINALIZATION_FAILED]", error);
+          console.log(`[SETTLEMENT] Finalized successfully with TX: ${tx}`);
+          await this.broadcastAlert("Launch Successfully Sealed & Finalized", metrics);
         }
-    }
+      } catch (err: any) {
+        console.error("[MONITOR ERROR]", err.message);
+      }
+    }, 10_000);
+  }
 }

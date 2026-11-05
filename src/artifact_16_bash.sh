@@ -1,17 +1,15 @@
-#!/usr/bin/env bash
-set -euo pipefail
+# 1. Setup Solana CLI configured to Mainnet or Devnet
+solana config set --url https://api.mainnet-beta.solana.com
+solana config set --keypair /path/to/deployer-keypair.json
 
-echo "===> [1/4] Building Anchor Solana Program"
-anchor build
+# 2. Build program artifacts with deterministic seeds
+anchor build --verifiable
 
-echo "===> [2/4] Deploying to Solana Network"
+# 3. Synchronize Program ID and deploy
 solana program deploy \
-  --program-id target/deploy/chimp_fair_launch-keypair.json \
-  target/deploy/chimp_fair_launch.so
+  --program-id target/deploy/chimp_launch-keypair.json \
+  target/deploy/chimp_launch.so
 
-echo "===> [3/4] Exporting IDL to Client"
-cp target/idl/chimp_fair_launch.json daemon/src/idl.json
-
-echo "===> [4/4] Starting Microservice Container"
-docker compose up -d --build
-echo "DEPLOYMENT COMPLETE. System Live."
+# 4. Verify deployment byte hash
+solana program dump ChimpLaunch1111111111111111111111111111111111 program_dump.so
+sha256sum program_dump.so

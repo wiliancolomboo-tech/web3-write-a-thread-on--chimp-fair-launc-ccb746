@@ -1,7 +1,8 @@
-Full open-source production release is live:
-✅ Verified Anchor Program with checked math & PDA vaults
-✅ Enterprise webhook automation (Discord, Slack, @resend)
-✅ 100% Pass Rate Test Suite (Refunds, Caps, & Claims)
-✅ Turnkey Dockerized daemon
+4/5 🔥 The Graduation Machine:
 
-Check out the full repository & technical architecture! 🍌🚀 @Solana
+At 85 SOL collected:
+1. Bonding curve seals trading atomically via state transition.
+2. 100% of accumulated SOL & reserve tokens mint Raydium CPMM LP shares.
+3. LP tokens are atomically transferred to the Token Incinerator.
+
+No admin multisig. No manual unlocks. Non-custodial finality.

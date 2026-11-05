@@ -1,73 +1,71 @@
 use anchor_lang::prelude::*;
-use crate::state::{LaunchPool, UserRecord, LaunchPhase};
+use crate::state::{LaunchConfig, LaunchStatus, UserReceipt, LAUNCH_SEED, USER_RECEIPT_SEED, VAULT_SEED};
 use crate::errors::FairLaunchError;
-use crate::events::RefundClaimedEvent;
 
 #[derive(Accounts)]
 pub struct Refund<'info> {
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub contributor: Signer<'info>,
 
     #[account(
         mut,
-        seeds = [b"launch_pool", launch_pool.token_mint.as_ref()],
-        bump = launch_pool.bump,
+        seeds = [LAUNCH_SEED, launch_config.token_mint.as_ref()],
+        bump = launch_config.bump,
         has_one = sol_vault
     )]
-    pub launch_pool: Account<'info, LaunchPool>,
+    pub launch_config: Account<'info, LaunchConfig>,
 
-    /// CHECK: Sol vault validated by seed and PDA signer
     #[account(
         mut,
-        seeds = [b"sol_vault", launch_pool.key().as_ref()],
-        bump = launch_pool.sol_vault_bump
+        seeds = [VAULT_SEED, launch_config.key().as_ref()],
+        bump = launch_config.sol_vault_bump
     )]
+    /// CHECK: Checked via PDA seeds
     pub sol_vault: AccountInfo<'info>,
 
     #[account(
         mut,
-        seeds = [b"user_record", launch_pool.key().as_ref(), user.key().as_ref()],
-        bump = user_record.bump,
-        has_one = user,
-        has_one = pool
+        seeds = [USER_RECEIPT_SEED, launch_config.key().as_ref(), contributor.key().as_ref()],
+        bump = user_receipt.bump,
+        has_one = contributor
     )]
-    pub user_record: Account<'info, UserRecord>,
+    pub user_receipt: Account<'info, UserReceipt>,
 
     pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<Refund>) -> Result<()> {
-    let pool = &ctx.accounts.launch_pool;
-    let user_record = &mut ctx.accounts.user_record;
+    let config = &ctx.accounts.launch_config;
+    let receipt = &mut ctx.accounts.user_receipt;
 
-    require!(pool.phase == LaunchPhase::FinalizedRefund, FairLaunchError::RefundNotPermitted);
-    require!(!user_record.has_claimed, FairLaunchError::AlreadyClaimed);
-    require!(user_record.deposited_amount > 0, FairLaunchError::ZeroBalance);
+    require!(config.status == LaunchStatus::Failed, FairLaunchError::SoftCapReached);
+    require!(!receipt.claimed, FairLaunchError::AlreadyClaimed);
+    let refund_amount = receipt.deposited_lamports;
+    require!(refund_amount > 0, FairLaunchError::ZeroContribution);
 
-    let refund_amount = user_record.deposited_amount;
-    user_record.deposited_amount = 0;
-    user_record.has_claimed = true;
+    receipt.deposited_lamports = 0;
+    receipt.claimed = true;
+
+    // Refund lamports from sol_vault to contributor directly
+    let config_key = config.key();
+    let sol_vault_seeds = &[
+        VAULT_SEED,
+        config_key.as_ref(),
+        &[config.sol_vault_bump],
+    ];
 
     **ctx.accounts.sol_vault.try_borrow_mut_lamports()? = ctx
-        .accounts
-        .sol_vault
+        .accounts.sol_vault
         .lamports()
         .checked_sub(refund_amount)
         .ok_or(FairLaunchError::MathOverflow)?;
 
-    **ctx.accounts.user.try_borrow_mut_lamports()? = ctx
-        .accounts
-        .user
+    **ctx.accounts.contributor.try_borrow_mut_lamports()? = ctx
+        .accounts.contributor
         .lamports()
         .checked_add(refund_amount)
         .ok_or(FairLaunchError::MathOverflow)?;
 
-    emit!(RefundClaimedEvent {
-        pool: pool.key(),
-        user: ctx.accounts.user.key(),
-        sol_refunded: refund_amount,
-        timestamp: Clock::get()?.unix_timestamp,
-    });
-
+    msg!("Refunded {} lamports to {}", refund_amount, receipt.contributor);
     Ok(())
 }

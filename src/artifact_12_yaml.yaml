@@ -1,24 +1,28 @@
 version: '3.8'
 
 services:
-  chimp-telemetry-daemon:
+  chimp-settlement-crank:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: chimp-telemetry-daemon
     restart: unless-stopped
     environment:
-      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - CHIMP_PROGRAM_ID=CH1MPy8vJbL37e8cHQ2mUvxvXwKzgH9F6Wn7yP4d83Z9
-      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-      - SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+      - RPC_URL=https://api.mainnet-beta.solana.com
+      - KEYPAIR_PATH=/run/secrets/crank_keypair.json
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your-enterprise-hook
+      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your-enterprise-hook
+      - POOL_PUBKEY=ChimpFL111111111111111111111111111111111111
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    secrets:
+      - crank_keypair.json
     healthcheck:
-      test: ["CMD-SHELL", "node -e 'console.log(\"Alive\")'"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+
+secrets:
+  crank_keypair.json:
+    file: ./crank-keypair.json

@@ -1,6 +1,5 @@
-2/3 🛠️ How does $CHIMP solve this?
+Audited Anchor contracts. Open-source Rust core. Instant enterprise telemetry notifications straight to Discord/Slack.
 
-Instead of an instant-swap bonding curve, we built an Epoch Commit-Batch Engine on @AnchorLang:
-✅ Zero spot swaps during deposit phase = zero sandwich attacks
-✅ Uniform Clearing Price (UCP): Everyone gets the exact same rate
-✅ Sybil-resistant wallet caps
+Check out the full open-source implementation and architecture breakdown here: https://github.com/chimp-protocol/chimp-fair-launch 
+
+Building the standard for fair launches on @solana. 🐒🚀 (3/3)

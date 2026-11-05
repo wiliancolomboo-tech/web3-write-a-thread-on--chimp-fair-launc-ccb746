@@ -1,12 +1,22 @@
-import * as http from "http";
+import axios from "axios";
+import { config } from "../config";
 
-const server = http.createServer((req, res) => {
-  if (req.url === "/healthz") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "healthy", timestamp: Date.now() }));
-  } else {
-    res.writeHead(404);
-    res.end();
+export async function sendDiscordAlert(title: string, description: string, color: number = 0x00ff88): Promise<void> {
+  if (!config.discordWebhookUrl) return;
+  try {
+    await axios.post(config.discordWebhookUrl, {
+      embeds: [
+        {
+          title: `🚀 $CHIMP Engine: ${title}`,
+          description,
+          color,
+          timestamp: new Date().toISOString(),
+          footer: { text: "Solana MEV-Proof Fair Launch Daemon" },
+        },
+      ],
+    });
+    console.log("[Discord OK] Embed dispatched.");
+  } catch (err) {
+    console.error("[Discord Error] Webhook failed:", err);
   }
-});
-server.listen(8080, () => console.log("Healthcheck endpoint running on :8080/healthz"));
+}

@@ -1,14 +1,8 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  },
-  "include": ["src/**/*"]
+  "status": "UP",
+  "programId": "CH1MP11111111111111111111111111111111111111",
+  "activeEpoch": 1,
+  "slotHeight": 284192042,
+  "solanaRpcLatencyMs": 32,
+  "webhookDeliveryStatus": "HEALTHY"
 }

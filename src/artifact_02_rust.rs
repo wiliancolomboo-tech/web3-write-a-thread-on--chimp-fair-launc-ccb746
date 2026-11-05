@@ -2,293 +2,243 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program::{transfer, Transfer};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer as SplTransfer};
 
-declare_id!("Ch1mpFa1rLaunch111111111111111111111111111111");
-
-pub const VAULT_SEED: &[u8] = b"vault";
-pub const USER_POSITION_SEED: &[u8] = b"user_position";
-pub const CONFIG_SEED: &[u8] = b"launch_config";
+declare_id!("CH1MP11111111111111111111111111111111111111");
 
 #[program]
 pub mod chimp_fair_launch {
     use super::*;
 
-    pub fn initialize_launch(
-        ctx: Context<InitializeLaunch>,
-        total_tokens_offered: u64,
-        soft_cap_lamports: u64,
-        hard_cap_lamports: u64,
+    /// Initialize the $CHIMP Fair Launch pool with target supply, caps, and slot windows.
+    pub fn initialize_pool(
+        ctx: Context<InitializePool>,
+        pool_name: String,
+        token_allocation: u64,
+        min_raise: u64,
+        max_raise: u64,
         start_slot: u64,
         end_slot: u64,
+        max_contribution_per_user: u64,
     ) -> Result<()> {
-        require!(
-            end_slot > start_slot,
-            FairLaunchError::InvalidSlotRange
-        );
-        require!(
-            hard_cap_lamports >= soft_cap_lamports,
-            FairLaunchError::InvalidCapRange
-        );
-        require!(
-            total_tokens_offered > 0,
-            FairLaunchError::ZeroTokenOffering
-        );
+        require!(pool_name.len() <= 32, FairLaunchError::NameTooLong);
+        require!(min_raise > 0, FairLaunchError::InvalidParameters);
+        require!(max_raise >= min_raise, FairLaunchError::InvalidParameters);
+        require!(start_slot < end_slot, FairLaunchError::InvalidWindow);
+        require!(token_allocation > 0, FairLaunchError::ZeroTokenAllocation);
 
-        let launch_config = &mut ctx.accounts.launch_config;
-        launch_config.authority = ctx.accounts.authority.key();
-        launch_config.token_mint = ctx.accounts.token_mint.key();
-        launch_config.pool_token_account = ctx.accounts.pool_token_account.key();
-        launch_config.vault_bump = ctx.bumps.vault_pda;
-        launch_config.config_bump = ctx.bumps.launch_config;
-        launch_config.total_tokens_offered = total_tokens_offered;
-        launch_config.soft_cap_lamports = soft_cap_lamports;
-        launch_config.hard_cap_lamports = hard_cap_lamports;
-        launch_config.start_slot = start_slot;
-        launch_config.end_slot = end_slot;
-        launch_config.total_sol_deposited = 0;
-        launch_config.is_finalized = false;
-        launch_config.tokens_deposited = false;
+        let current_slot = Clock::get()?.slot;
+        require!(start_slot >= current_slot, FairLaunchError::WindowInPast);
 
-        emit!(LaunchInitializedEvent {
-            token_mint: launch_config.token_mint,
-            total_tokens: total_tokens_offered,
-            start_slot,
-            end_slot,
-            hard_cap: hard_cap_lamports,
-        });
+        let pool = &mut ctx.accounts.pool;
+        pool.authority = ctx.accounts.authority.key();
+        pool.token_mint = ctx.accounts.token_mint.key();
+        pool.token_vault = ctx.accounts.token_vault.key();
+        pool.sol_vault = ctx.accounts.sol_vault.key();
+        pool.pool_name = pool_name;
+        pool.token_allocation = token_allocation;
+        pool.min_raise = min_raise;
+        pool.max_raise = max_raise;
+        pool.total_sol_raised = 0;
+        pool.start_slot = start_slot;
+        pool.end_slot = end_slot;
+        pool.max_contribution_per_user = max_contribution_per_user;
+        pool.is_finalized = false;
+        pool.is_cancelled = false;
+        pool.bump = ctx.bumps.pool;
+        pool.sol_vault_bump = ctx.bumps.sol_vault;
 
-        Ok(())
-    }
-
-    pub fn deposit_pool_tokens(
-        ctx: Context<DepositPoolTokens>,
-        amount: u64,
-    ) -> Result<()> {
-        let launch_config = &mut ctx.accounts.launch_config;
-        require!(
-            !launch_config.tokens_deposited,
-            FairLaunchError::TokensAlreadyDeposited
-        );
-        require!(
-            amount == launch_config.total_tokens_offered,
-            FairLaunchError::DepositAmountMismatch
-        );
-
+        // Escrow total allocation of $CHIMP from authority to program vault
         let cpi_accounts = SplTransfer {
             from: ctx.accounts.authority_token_account.to_account_info(),
-            to: ctx.accounts.pool_token_account.to_account_info(),
+            to: ctx.accounts.token_vault.to_account_info(),
             authority: ctx.accounts.authority.to_account_info(),
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, amount)?;
+        token::transfer(CpiContext::new(cpi_program, cpi_accounts), token_allocation)?;
 
-        launch_config.tokens_deposited = true;
-
-        emit!(TokensDepositedEvent {
-            mint: launch_config.token_mint,
-            amount,
+        emit!(PoolInitializedEvent {
+            pool: pool.key(),
+            authority: pool.authority,
+            token_mint: pool.token_mint,
+            token_allocation,
+            min_raise,
+            max_raise,
+            start_slot,
+            end_slot,
         });
 
         Ok(())
     }
 
-    pub fn deposit_sol(ctx: Context<DepositSol>, amount: u64) -> Result<()> {
-        let clock = Clock::get()?;
-        let current_slot = clock.slot;
-        let launch_config = &mut ctx.accounts.launch_config;
+    /// User commits native SOL into the vault during the active participation window.
+    pub fn contribute(ctx: Context<Contribute>, amount: u64) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        let user_contribution = &mut ctx.accounts.user_contribution;
+        let current_slot = Clock::get()?.slot;
 
-        require!(
-            current_slot >= launch_config.start_slot,
-            FairLaunchError::LaunchNotActive
-        );
-        require!(
-            current_slot <= launch_config.end_slot,
-            FairLaunchError::LaunchExpired
-        );
-        require!(
-            !launch_config.is_finalized,
-            FairLaunchError::LaunchFinalized
-        );
-        require!(amount > 0, FairLaunchError::ZeroDeposit);
+        require!(!pool.is_finalized && !pool.is_cancelled, FairLaunchError::PoolInactive);
+        require!(current_slot >= pool.start_slot, FairLaunchError::LaunchNotStarted);
+        require!(current_slot <= pool.end_slot, FairLaunchError::LaunchEnded);
+        require!(amount > 0, FairLaunchError::ZeroContribution);
 
-        // Native SOL transfer into program-controlled escrow PDA
+        let new_user_total = user_contribution.sol_amount.checked_add(amount)
+            .ok_or(FairLaunchError::MathOverflow)?;
+        require!(
+            new_user_total <= pool.max_contribution_per_user,
+            FairLaunchError::ExceedsUserCap
+        );
+
+        let new_pool_total = pool.total_sol_raised.checked_add(amount)
+            .ok_or(FairLaunchError::MathOverflow)?;
+        require!(new_pool_total <= pool.max_raise, FairLaunchError::ExceedsMaxRaise);
+
+        // Execute SOL transfer to deterministic Sol Vault PDA
         let cpi_context = CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
             Transfer {
                 from: ctx.accounts.user.to_account_info(),
-                to: ctx.accounts.vault_pda.to_account_info(),
+                to: ctx.accounts.sol_vault.to_account_info(),
             },
         );
         transfer(cpi_context, amount)?;
 
-        // Update balances
-        launch_config.total_sol_deposited = launch_config
-            .total_sol_deposited
-            .checked_add(amount)
-            .ok_or(FairLaunchError::MathOverflow)?;
-
-        let position = &mut ctx.accounts.user_position;
-        if position.owner == Pubkey::default() {
-            position.owner = ctx.accounts.user.key();
-            position.launch_config = launch_config.key();
-            position.deposited_lamports = 0;
-            position.claimed = false;
+        // Update state
+        pool.total_sol_raised = new_pool_total;
+        if user_contribution.sol_amount == 0 {
+            user_contribution.user = ctx.accounts.user.key();
+            user_contribution.pool = pool.key();
+            user_contribution.tokens_claimed = false;
+            user_contribution.bump = ctx.bumps.user_contribution;
         }
+        user_contribution.sol_amount = new_user_total;
 
-        position.deposited_lamports = position
-            .deposited_lamports
-            .checked_add(amount)
-            .ok_or(FairLaunchError::MathOverflow)?;
-
-        emit!(SolDepositedEvent {
+        emit!(ContributionMadeEvent {
+            pool: pool.key(),
             user: ctx.accounts.user.key(),
             amount,
-            cumulative_user: position.deposited_lamports,
-            total_vault_sol: launch_config.total_sol_deposited,
+            total_user_sol: new_user_total,
+            total_pool_sol: new_pool_total,
+            slot: current_slot,
         });
 
         Ok(())
     }
 
-    pub fn finalize_launch(ctx: Context<FinalizeLaunch>) -> Result<()> {
-        let clock = Clock::get()?;
-        let current_slot = clock.slot;
-        let launch_config = &mut ctx.accounts.launch_config;
+    /// Finalize pool state after window closes. Prepares liquidity allocation or triggers cancellation.
+    pub fn finalize_pool(ctx: Context<FinalizePool>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        let current_slot = Clock::get()?.slot;
 
+        require!(!pool.is_finalized, FairLaunchError::AlreadyFinalized);
         require!(
-            current_slot > launch_config.end_slot,
-            FairLaunchError::EpochStillRunning
-        );
-        require!(
-            !launch_config.is_finalized,
-            FairLaunchError::LaunchFinalized
-        );
-        require!(
-            launch_config.tokens_deposited,
-            FairLaunchError::PoolTokensNotDeposited
+            current_slot > pool.end_slot || pool.total_sol_raised == pool.max_raise,
+            FairLaunchError::LaunchStillActive
         );
 
-        launch_config.is_finalized = true;
-
-        emit!(LaunchFinalizedEvent {
-            total_raised: launch_config.total_sol_deposited,
-            hard_cap: launch_config.hard_cap_lamports,
-            soft_cap: launch_config.soft_cap_lamports,
-            is_successful: launch_config.total_sol_deposited >= launch_config.soft_cap_lamports,
-        });
-
-        Ok(())
-    }
-
-    pub fn claim_and_refund(ctx: Context<ClaimAndRefund>) -> Result<()> {
-        let launch_config = &ctx.accounts.launch_config;
-        let user_position = &mut ctx.accounts.user_position;
-
-        require!(
-            launch_config.is_finalized,
-            FairLaunchError::LaunchNotFinalized
-        );
-        require!(!user_position.claimed, FairLaunchError::AlreadyClaimed);
-        require!(
-            user_position.deposited_lamports > 0,
-            FairLaunchError::ZeroDeposit
-        );
-
-        user_position.claimed = true;
-
-        let total_raised = launch_config.total_sol_deposited;
-        let user_contrib = user_position.deposited_lamports;
-        let soft_cap = launch_config.soft_cap_lamports;
-        let hard_cap = launch_config.hard_cap_lamports;
-
-        // SCENARIO 1: Soft Cap Failed -> 100% Refund
-        if total_raised < soft_cap {
-            let vault_bump = launch_config.vault_bump;
-            let config_key = launch_config.key();
-            let seeds = &[
-                VAULT_SEED,
-                config_key.as_ref(),
-                &[vault_bump],
-            ];
-            let signer_seeds = &[&seeds[..]];
-
-            **ctx.accounts.vault_pda.try_borrow_mut_lamports()? -= user_contrib;
-            **ctx.accounts.user.try_borrow_mut_lamports()? += user_contrib;
-
-            emit!(RefundProcessedEvent {
-                user: ctx.accounts.user.key(),
-                sol_refunded: user_contrib,
-                tokens_claimed: 0,
+        if pool.total_sol_raised < pool.min_raise {
+            pool.is_cancelled = true;
+            pool.is_finalized = true;
+            emit!(PoolCancelledEvent {
+                pool: pool.key(),
+                total_sol_raised: pool.total_sol_raised,
+                min_raise: pool.min_raise,
             });
             return Ok(());
         }
 
-        // SCENARIO 2: Successful Launch (Pro-Rata Calculation)
-        let (tokens_owed, sol_refund) = if total_raised > hard_cap {
-            // Raised above hardcap -> Scale token share & refund excess SOL
-            // effective_fraction = user_contrib / total_raised
-            // tokens = user_contrib * total_tokens / total_raised
-            // user_absorbed_sol = user_contrib * hard_cap / total_raised
-            // refund = user_contrib - user_absorbed_sol
-            let tokens = (user_contrib as u128)
-                .checked_mul(launch_config.total_tokens_offered as u128)
-                .ok_or(FairLaunchError::MathOverflow)?
-                .checked_div(total_raised as u128)
-                .ok_or(FairLaunchError::MathOverflow)? as u64;
+        pool.is_finalized = true;
 
-            let sol_used = (user_contrib as u128)
-                .checked_mul(hard_cap as u128)
-                .ok_or(FairLaunchError::MathOverflow)?
-                .checked_div(total_raised as u128)
-                .ok_or(FairLaunchError::MathOverflow)? as u64;
+        emit!(PoolFinalizedEvent {
+            pool: pool.key(),
+            total_sol_raised: pool.total_sol_raised,
+            token_allocation: pool.token_allocation,
+            final_clearing_ratio: pool.token_allocation as f64 / pool.total_sol_raised as f64,
+        });
 
-            let refund = user_contrib
-                .checked_sub(sol_used)
-                .ok_or(FairLaunchError::MathOverflow)?;
+        Ok(())
+    }
 
-            (tokens, refund)
-        } else {
-            // Total raised is between soft cap and hard cap
-            // tokens = user_contrib * total_tokens / total_raised
-            let tokens = (user_contrib as u128)
-                .checked_mul(launch_config.total_tokens_offered as u128)
-                .ok_or(FairLaunchError::MathOverflow)?
-                .checked_div(total_raised as u128)
-                .ok_or(FairLaunchError::MathOverflow)? as u64;
-            (tokens, 0)
+    /// Pro-rata token claim execution for participating contributors once finalized.
+    pub fn claim_tokens(ctx: Context<ClaimTokens>) -> Result<()> {
+        let pool = &ctx.accounts.pool;
+        let user_contribution = &mut ctx.accounts.user_contribution;
+
+        require!(pool.is_finalized, FairLaunchError::NotFinalized);
+        require!(!pool.is_cancelled, FairLaunchError::PoolCancelled);
+        require!(!user_contribution.tokens_claimed, FairLaunchError::AlreadyClaimed);
+        require!(user_contribution.sol_amount > 0, FairLaunchError::NoContribution);
+
+        // Pro-rata distribution: (user_sol * token_allocation) / total_sol_raised
+        let user_token_reward = (user_contribution.sol_amount as u128)
+            .checked_mul(pool.token_allocation as u128)
+            .ok_or(FairLaunchError::MathOverflow)?
+            .checked_div(pool.total_sol_raised as u128)
+            .ok_or(FairLaunchError::MathOverflow)? as u64;
+
+        user_contribution.tokens_claimed = true;
+
+        let pool_name = pool.pool_name.as_bytes();
+        let seeds = &[
+            b"fair_launch".as_ref(),
+            pool_name,
+            &[pool.bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = SplTransfer {
+            from: ctx.accounts.token_vault.to_account_info(),
+            to: ctx.accounts.user_token_account.to_account_info(),
+            authority: pool.to_account_info(),
         };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        token::transfer(
+            CpiContext::new_with_signer(cpi_program, cpi_accounts, signer),
+            user_token_reward,
+        )?;
 
-        // Transfer SOL refund if any
-        if sol_refund > 0 {
-            **ctx.accounts.vault_pda.try_borrow_mut_lamports()? -= sol_refund;
-            **ctx.accounts.user.try_borrow_mut_lamports()? += sol_refund;
-        }
-
-        // Transfer $CHIMP Tokens via PDA signing authority
-        if tokens_owed > 0 {
-            let vault_bump = launch_config.vault_bump;
-            let config_key = launch_config.key();
-            let seeds = &[
-                VAULT_SEED,
-                config_key.as_ref(),
-                &[vault_bump],
-            ];
-            let signer_seeds = &[&seeds[..]];
-
-            let cpi_accounts = SplTransfer {
-                from: ctx.accounts.pool_token_account.to_account_info(),
-                to: ctx.accounts.user_token_account.to_account_info(),
-                authority: ctx.accounts.vault_pda.to_account_info(),
-            };
-            let cpi_program = ctx.accounts.token_program.to_account_info();
-            let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-            token::transfer(cpi_ctx, tokens_owed)?;
-        }
-
-        emit!(AllocationClaimedEvent {
+        emit!(TokensClaimedEvent {
+            pool: pool.key(),
             user: ctx.accounts.user.key(),
-            tokens_claimed: tokens_owed,
-            sol_refunded: sol_refund,
+            amount: user_token_reward,
+        });
+
+        Ok(())
+    }
+
+    /// Claim full SOL refund if minimum raise softcap was not met.
+    pub fn claim_refund(ctx: Context<ClaimRefund>) -> Result<()> {
+        let pool = &ctx.accounts.pool;
+        let user_contribution = &mut ctx.accounts.user_contribution;
+
+        require!(pool.is_finalized && pool.is_cancelled, FairLaunchError::RefundNotAvailable);
+        require!(!user_contribution.tokens_claimed, FairLaunchError::AlreadyRefunded);
+        require!(user_contribution.sol_amount > 0, FairLaunchError::NoContribution);
+
+        let refund_amount = user_contribution.sol_amount;
+        user_contribution.sol_amount = 0;
+        user_contribution.tokens_claimed = true;
+
+        let pool_name = pool.pool_name.as_bytes();
+        let seeds = &[
+            b"sol_vault".as_ref(),
+            pool_name,
+            &[pool.sol_vault_bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        let cpi_context = CpiContext::new_with_signer(
+            ctx.accounts.system_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.sol_vault.to_account_info(),
+                to: ctx.accounts.user.to_account_info(),
+            },
+            signer,
+        );
+        transfer(cpi_context, refund_amount)?;
+
+        emit!(RefundIssuedEvent {
+            pool: pool.key(),
+            user: ctx.accounts.user.key(),
+            amount: refund_amount,
         });
 
         Ok(())
@@ -296,26 +246,20 @@ pub mod chimp_fair_launch {
 }
 
 // -----------------------------------------------------------------------------
-// ACCOUNT VALIDATION CONTEXTS
+// ACCOUNT VALIDATION STRUCTS
 // -----------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct InitializeLaunch<'info> {
+#[instruction(pool_name: String)]
+pub struct InitializePool<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + LaunchConfig::INIT_SPACE,
-        seeds = [CONFIG_SEED, token_mint.key().as_ref()],
+        space = 8 + LaunchPool::INIT_SPACE,
+        seeds = [b"fair_launch", pool_name.as_bytes()],
         bump
     )]
-    pub launch_config: Account<'info, LaunchConfig>,
-
-    #[account(
-        seeds = [VAULT_SEED, launch_config.key().as_ref()],
-        bump
-    )]
-    /// CHECK: Native lamports custody account controlled by PDA seeds
-    pub vault_pda: AccountInfo<'info>,
+    pub pool: Account<'info, LaunchPool>,
 
     pub token_mint: Account<'info, Mint>,
 
@@ -323,9 +267,24 @@ pub struct InitializeLaunch<'info> {
         init,
         payer = authority,
         token::mint = token_mint,
-        token::authority = vault_pda
+        token::authority = pool,
+        seeds = [b"token_vault", pool_name.as_bytes()],
+        bump
     )]
-    pub pool_token_account: Account<'info, TokenAccount>,
+    pub token_vault: Account<'info, TokenAccount>,
+
+    /// CHECK: PDA acting as native SOL accumulator
+    #[account(
+        init,
+        payer = authority,
+        space = 0,
+        seeds = [b"sol_vault", pool_name.as_bytes()],
+        bump
+    )]
+    pub sol_vault: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub authority_token_account: Account<'info, TokenAccount>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -336,49 +295,30 @@ pub struct InitializeLaunch<'info> {
 }
 
 #[derive(Accounts)]
-pub struct DepositPoolTokens<'info> {
+pub struct Contribute<'info> {
     #[account(
         mut,
-        has_one = authority,
-        has_one = pool_token_account
+        seeds = [b"fair_launch", pool.pool_name.as_bytes()],
+        bump = pool.bump
     )]
-    pub launch_config: Account<'info, LaunchConfig>,
+    pub pool: Account<'info, LaunchPool>,
 
-    #[account(mut)]
-    pub pool_token_account: Account<'info, TokenAccount>,
-
+    /// CHECK: Native SOL vault PDA
     #[account(
         mut,
-        token::mint = launch_config.token_mint,
-        token::authority = authority
+        seeds = [b"sol_vault", pool.pool_name.as_bytes()],
+        bump = pool.sol_vault_bump
     )]
-    pub authority_token_account: Account<'info, TokenAccount>,
-
-    pub authority: Signer<'info>,
-    pub token_program: Program<'info, Token>,
-}
-
-#[derive(Accounts)]
-pub struct DepositSol<'info> {
-    #[account(mut)]
-    pub launch_config: Account<'info, LaunchConfig>,
-
-    #[account(
-        mut,
-        seeds = [VAULT_SEED, launch_config.key().as_ref()],
-        bump = launch_config.vault_bump
-    )]
-    /// CHECK: Checked via PDA derivation seeds
-    pub vault_pda: AccountInfo<'info>,
+    pub sol_vault: AccountInfo<'info>,
 
     #[account(
         init_if_needed,
         payer = user,
-        space = 8 + UserPosition::INIT_SPACE,
-        seeds = [USER_POSITION_SEED, launch_config.key().as_ref(), user.key().as_ref()],
+        space = 8 + UserContribution::INIT_SPACE,
+        seeds = [b"contribution", pool.key().as_ref(), user.key().as_ref()],
         bump
     )]
-    pub user_position: Account<'info, UserPosition>,
+    pub user_contribution: Account<'info, UserContribution>,
 
     #[account(mut)]
     pub user: Signer<'info>,
@@ -386,167 +326,209 @@ pub struct DepositSol<'info> {
 }
 
 #[derive(Accounts)]
-pub struct FinalizeLaunch<'info> {
-    #[account(mut)]
-    pub launch_config: Account<'info, LaunchConfig>,
-    pub caller: Signer<'info>,
+pub struct FinalizePool<'info> {
+    #[account(
+        mut,
+        seeds = [b"fair_launch", pool.pool_name.as_bytes()],
+        bump = pool.bump
+    )]
+    pub pool: Account<'info, LaunchPool>,
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
-pub struct ClaimAndRefund<'info> {
+pub struct ClaimTokens<'info> {
     #[account(
-        mut,
-        seeds = [CONFIG_SEED, launch_config.token_mint.as_ref()],
-        bump = launch_config.config_bump
+        seeds = [b"fair_launch", pool.pool_name.as_bytes()],
+        bump = pool.bump
     )]
-    pub launch_config: Account<'info, LaunchConfig>,
+    pub pool: Account<'info, LaunchPool>,
 
     #[account(
         mut,
-        seeds = [VAULT_SEED, launch_config.key().as_ref()],
-        bump = launch_config.vault_bump
+        seeds = [b"token_vault", pool.pool_name.as_bytes()],
+        bump
     )]
-    /// CHECK: Lamport release validated by PDA seeds
-    pub vault_pda: AccountInfo<'info>,
+    pub token_vault: Account<'info, TokenAccount>,
 
     #[account(
         mut,
-        seeds = [USER_POSITION_SEED, launch_config.key().as_ref(), user.key().as_ref()],
-        bump,
-        has_one = user
+        seeds = [b"contribution", pool.key().as_ref(), user.key().as_ref()],
+        bump = user_contribution.bump,
+        has_one = user,
+        has_one = pool
     )]
-    pub user_position: Account<'info, UserPosition>,
+    pub user_contribution: Account<'info, UserContribution>,
 
     #[account(
         mut,
-        seeds = [launch_config.pool_token_account.as_ref()],
-        bump,
-        constraint = pool_token_account.key() == launch_config.pool_token_account
-    )]
-    pub pool_token_account: Account<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        token::mint = launch_config.token_mint,
+        token::mint = pool.token_mint,
         token::authority = user
     )]
     pub user_token_account: Account<'info, TokenAccount>,
 
     #[account(mut)]
     pub user: Signer<'info>,
-
     pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimRefund<'info> {
+    #[account(
+        seeds = [b"fair_launch", pool.pool_name.as_bytes()],
+        bump = pool.bump
+    )]
+    pub pool: Account<'info, LaunchPool>,
+
+    /// CHECK: Native SOL vault PDA
+    #[account(
+        mut,
+        seeds = [b"sol_vault", pool.pool_name.as_bytes()],
+        bump = pool.sol_vault_bump
+    )]
+    pub sol_vault: AccountInfo<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"contribution", pool.key().as_ref(), user.key().as_ref()],
+        bump = user_contribution.bump,
+        has_one = user,
+        has_one = pool
+    )]
+    pub user_contribution: Account<'info, UserContribution>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
 // -----------------------------------------------------------------------------
-// DATA STATE STRUCTURES
+// DATA STATE & EVENTS
 // -----------------------------------------------------------------------------
 
 #[account]
 #[derive(InitSpace)]
-pub struct LaunchConfig {
+pub struct LaunchPool {
     pub authority: Pubkey,
     pub token_mint: Pubkey,
-    pub pool_token_account: Pubkey,
-    pub vault_bump: u8,
-    pub config_bump: u8,
-    pub total_tokens_offered: u64,
-    pub soft_cap_lamports: u64,
-    pub hard_cap_lamports: u64,
+    pub token_vault: Pubkey,
+    pub sol_vault: Pubkey,
+    #[max_len(32)]
+    pub pool_name: String,
+    pub token_allocation: u64,
+    pub min_raise: u64,
+    pub max_raise: u64,
+    pub total_sol_raised: u64,
     pub start_slot: u64,
     pub end_slot: u64,
-    pub total_sol_deposited: u64,
+    pub max_contribution_per_user: u64,
     pub is_finalized: bool,
-    pub tokens_deposited: bool,
+    pub is_cancelled: bool,
+    pub bump: u8,
+    pub sol_vault_bump: u8,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct UserPosition {
-    pub owner: Pubkey,
-    pub launch_config: Pubkey,
-    pub deposited_lamports: u64,
-    pub claimed: bool,
+pub struct UserContribution {
+    pub user: Pubkey,
+    pub pool: Pubkey,
+    pub sol_amount: u64,
+    pub tokens_claimed: bool,
+    pub bump: u8,
 }
 
-// -----------------------------------------------------------------------------
-// EVENTS & ERRORS
-// -----------------------------------------------------------------------------
-
 #[event]
-pub struct LaunchInitializedEvent {
+pub struct PoolInitializedEvent {
+    pub pool: Pubkey,
+    pub authority: Pubkey,
     pub token_mint: Pubkey,
-    pub total_tokens: u64,
+    pub token_allocation: u64,
+    pub min_raise: u64,
+    pub max_raise: u64,
     pub start_slot: u64,
     pub end_slot: u64,
-    pub hard_cap: u64,
 }
 
 #[event]
-pub struct TokensDepositedEvent {
-    pub mint: Pubkey,
+pub struct ContributionMadeEvent {
+    pub pool: Pubkey,
+    pub user: Pubkey,
+    pub amount: u64,
+    pub total_user_sol: u64,
+    pub total_pool_sol: u64,
+    pub slot: u64,
+}
+
+#[event]
+pub struct PoolFinalizedEvent {
+    pub pool: Pubkey,
+    pub total_sol_raised: u64,
+    pub token_allocation: u64,
+    pub final_clearing_ratio: f64,
+}
+
+#[event]
+pub struct PoolCancelledEvent {
+    pub pool: Pubkey,
+    pub total_sol_raised: u64,
+    pub min_raise: u64,
+}
+
+#[event]
+pub struct TokensClaimedEvent {
+    pub pool: Pubkey,
+    pub user: Pubkey,
     pub amount: u64,
 }
 
 #[event]
-pub struct SolDepositedEvent {
+pub struct RefundIssuedEvent {
+    pub pool: Pubkey,
     pub user: Pubkey,
     pub amount: u64,
-    pub cumulative_user: u64,
-    pub total_vault_sol: u64,
-}
-
-#[event]
-pub struct LaunchFinalizedEvent {
-    pub total_raised: u64,
-    pub hard_cap: u64,
-    pub soft_cap: u64,
-    pub is_successful: bool,
-}
-
-#[event]
-pub struct AllocationClaimedEvent {
-    pub user: Pubkey,
-    pub tokens_claimed: u64,
-    pub sol_refunded: u64,
-}
-
-#[event]
-pub struct RefundProcessedEvent {
-    pub user: Pubkey,
-    pub sol_refunded: u64,
-    pub tokens_claimed: u64,
 }
 
 #[error_code]
 pub enum FairLaunchError {
-    #[msg("Invalid slot range specified")]
-    InvalidSlotRange,
-    #[msg("Hard cap must be greater than or equal to soft cap")]
-    InvalidCapRange,
-    #[msg("Total tokens offered must be strictly positive")]
-    ZeroTokenOffering,
-    #[msg("Tokens have already been transferred into escrow")]
-    TokensAlreadyDeposited,
-    #[msg("Token deposit amount does not equal total tokens offered")]
-    DepositAmountMismatch,
-    #[msg("Fair launch is not currently active")]
-    LaunchNotActive,
-    #[msg("Fair launch participation window has expired")]
-    LaunchExpired,
-    #[msg("Fair launch has already been finalized")]
-    LaunchFinalized,
-    #[msg("Deposit amount must be strictly greater than zero")]
-    ZeroDeposit,
-    #[msg("Mathematical overflow occurred during clearing calculations")]
+    #[msg("Pool name exceeds maximum length of 32 bytes.")]
+    NameTooLong,
+    #[msg("Invalid economic parameters: ensure min <= max and min > 0.")]
+    InvalidParameters,
+    #[msg("Invalid slot configuration: start_slot must precede end_slot.")]
+    InvalidWindow,
+    #[msg("Token allocation must be non-zero.")]
+    ZeroTokenAllocation,
+    #[msg("Start slot cannot be in the past.")]
+    WindowInPast,
+    #[msg("Fair launch pool is currently inactive or completed.")]
+    PoolInactive,
+    #[msg("Launch has not reached start slot yet.")]
+    LaunchNotStarted,
+    #[msg("Launch time window has lapsed.")]
+    LaunchEnded,
+    #[msg("Contribution must be greater than zero.")]
+    ZeroContribution,
+    #[msg("Contribution exceeds maximum individual allocation allowance.")]
+    ExceedsUserCap,
+    #[msg("Contribution would exceed total pool maximum cap.")]
+    ExceedsMaxRaise,
+    #[msg("Mathematical calculation overflow.")]
     MathOverflow,
-    #[msg("Fair launch participation window has not yet concluded")]
-    EpochStillRunning,
-    #[msg("Offering tokens have not yet been deposited to pool escrow")]
-    PoolTokensNotDeposited,
-    #[msg("Fair launch has not yet been finalized")]
-    LaunchNotFinalized,
-    #[msg("Allocations or refunds have already been claimed for this address")]
+    #[msg("Launch pool is already finalized.")]
+    AlreadyFinalized,
+    #[msg("Launch duration still running and cap not hit.")]
+    LaunchStillActive,
+    #[msg("Pool not yet finalized.")]
+    NotFinalized,
+    #[msg("Pool was cancelled due to unmet softcap.")]
+    PoolCancelled,
+    #[msg("User has already executed token claim.")]
     AlreadyClaimed,
+    #[msg("No active contribution found for user.")]
+    NoContribution,
+    #[msg("Refunds only valid if launch pool did not reach softcap.")]
+    RefundNotAvailable,
+    #[msg("Refund already claimed.")]
+    AlreadyRefunded,
 }

@@ -1,20 +1,28 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  chimp-monitor:
+  chimp-keeper:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: chimp_fair_launch_monitor
+    container_name: chimp-fairlaunch-keeper
     restart: always
     environment:
-      - SOLANA_RPC_ENDPOINT=https://api.mainnet-beta.solana.com
-      - CHIMP_PROGRAM_ID=Ch1mpFL111111111111111111111111111111111111
-      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-      - SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-      - WEBHOOK_HMAC_SECRET=b8c8d20894fc54bb3f72eec30a3
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=CH1MPfaiR1111111111111111111111111111111111
+      - CHIMP_TOKEN_MINT=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
+      - KEEPER_KEYPAIR_PATH=/secrets/keeper-keypair.json
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+    volumes:
+      - ./secrets:/secrets:ro
     logging:
       driver: "json-file"
       options:
-        max-size: "20m"
+        max-size: "50m"
         max-file: "5"
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

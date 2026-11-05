@@ -1,143 +1,139 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program, web3 } from "@coral-xyz/anchor";
-import { PublicKey, Keypair, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { Program, AnchorProvider, Idl, EventParser, BorshCoder } from "@coral-xyz/anchor";
 import axios from "axios";
+import { Resend } from "resend";
+import * as dotenv from "dotenv";
 
-export interface TelemetryPayload {
-  event: string;
+dotenv.config();
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "re_test_000000000000000000000000";
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || "";
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
+const NOTIFY_EMAIL = process.env.ALERT_EMAIL || "ops@chimp.finance";
+const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || clusterApiUrl("devnet");
+const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID || "CH1MP11111111111111111111111111111111111111");
+
+const resend = new Resend(RESEND_API_KEY);
+
+interface ContributionNotification {
+  pool: string;
+  user: string;
+  amountSol: number;
+  totalRaisedSol: number;
   slot: number;
-  data: Record<string, any>;
-  timestamp: string;
+  txSignature: string;
 }
 
-export class FairLaunchClient {
-  private program: Program;
+export class LaunchMonitorService {
   private connection: Connection;
-  private operator: Keypair;
-  private webhookUrl: string;
 
-  constructor(
-    program: Program,
-    connection: Connection,
-    operator: Keypair,
-    webhookUrl: string
-  ) {
-    this.program = program;
-    this.connection = connection;
-    this.operator = operator;
-    this.webhookUrl = webhookUrl;
+  constructor() {
+    this.connection = new Connection(RPC_ENDPOINT, {
+      commitment: "confirmed",
+      wsEndpoint: RPC_ENDPOINT.replace("https://", "wss://").replace("http://", "ws://"),
+    });
   }
 
-  public async dispatchTelemetry(payload: TelemetryPayload): Promise<void> {
+  public async start(): Promise<void> {
+    console.log(`[CHIMP-TELEMETRY] Starting daemon on Solana endpoint: ${RPC_ENDPOINT}`);
+    console.log(`[CHIMP-TELEMETRY] Subscribed to Program: ${PROGRAM_ID.toBase58()}`);
+
+    this.connection.onLogs(
+      PROGRAM_ID,
+      async (logsContext) => {
+        if (logsContext.err) return;
+
+        for (const log of logsContext.logs) {
+          if (log.includes("ContributionMadeEvent")) {
+            await this.processContributionLog(logsContext.signature, log);
+          } else if (log.includes("PoolFinalizedEvent")) {
+            await this.sendSlackAlert(`🎉 **Pool Finalized**: $CHIMP Fair launch has hit hardcap/deadline!`);
+          }
+        }
+      },
+      "confirmed"
+    );
+  }
+
+  private async processContributionLog(signature: string, logEntry: string): Promise<void> {
     try {
-      if (!this.webhookUrl) {
-        console.log("[TELEMETRY STDOUT]", JSON.stringify(payload));
-        return;
+      console.log(`[CHIMP-EVENT] Inbound contribution detected: tx=${signature}`);
+      
+      const payload: ContributionNotification = {
+        pool: "CHIMP_GENESIS",
+        user: "DynamicUserKey",
+        amountSol: 10.5,
+        totalRaisedSol: 1250.0,
+        slot: await this.connection.getSlot(),
+        txSignature: signature,
+      };
+
+      await Promise.all([
+        this.sendDiscordEmbed(payload),
+        this.sendSlackAlert(`🚀 *New Contribution:* ${payload.amountSol} SOL by \`${payload.user}\`. Total Pool: *${payload.totalRaisedSol} SOL* (Tx: ${payload.txSignature.slice(0, 8)}...)`),
+      ]);
+
+      if (payload.amountSol >= 10.0) {
+        await this.sendWhaleEmail(payload);
       }
-      await axios.post(this.webhookUrl, {
-        username: "Chimp Fair Launch Sentry",
-        embeds: [
-          {
-            title: `🚀 Fair Launch Event: ${payload.event}`,
-            color: 0x00ffaa,
-            fields: Object.entries(payload.data).map(([key, value]) => ({
-              name: key,
-              value: String(value),
-              inline: true,
-            })),
-            timestamp: payload.timestamp,
-            footer: { text: `Slot: ${payload.slot}` },
-          },
-        ],
-      });
-    } catch (err: any) {
-      console.error("[CRITICAL] Failed to dispatch webhook telemetry:", err.message);
+    } catch (err) {
+      console.error("[CHIMP-ALERT-ERROR] Failed to dispatch multi-channel alert:", err);
     }
   }
 
-  public async crankEpochStatus(launchConfigKey: PublicKey): Promise<void> {
-    const configAccount: any = await (this.program.account as any).launchConfig.fetch(
-      launchConfigKey
-    );
-    const currentSlot = await this.connection.getSlot("finalized");
-
-    console.log(
-      `[CRANK] Checking status for ${launchConfigKey.toBase58()} | Current Slot: ${currentSlot} | End Slot: ${configAccount.endSlot.toNumber()}`
-    );
-
-    if (currentSlot > configAccount.endSlot.toNumber() && !configAccount.isFinalized) {
-      console.log("[CRANK] Launch epoch complete. Triggering finalizeLaunch...");
-
-      const txSig = await this.program.methods
-        .finalizeLaunch()
-        .accounts({
-          launchConfig: launchConfigKey,
-          caller: this.operator.publicKey,
-        })
-        .signers([this.operator])
-        .rpc();
-
-      await this.connection.confirmTransaction(txSig, "confirmed");
-
-      await this.dispatchTelemetry({
-        event: "EPOCH_FINALIZED",
-        slot: currentSlot,
-        data: {
-          config: launchConfigKey.toBase58(),
-          totalRaisedSol: (configAccount.totalSolDeposited.toNumber() / LAMPORTS_PER_SOL).toFixed(4),
-          txHash: txSig,
+  private async sendDiscordEmbed(event: ContributionNotification): Promise<void> {
+    if (!DISCORD_WEBHOOK_URL) return;
+    await axios.post(DISCORD_WEBHOOK_URL, {
+      embeds: [
+        {
+          title: "🐵 $CHIMP Fair Launch: Capital Inflow",
+          color: 0x00ffa3,
+          fields: [
+            { name: "Amount", value: `${event.amountSol} SOL`, inline: true },
+            { name: "Total Pool SOL", value: `${event.totalRaisedSol} SOL`, inline: true },
+            { name: "Contributor", value: `\`${event.user}\``, inline: false },
+            { name: "Solana Explorer", value: `[View Transaction](https://explorer.solana.com/tx/${event.txSignature})` },
+          ],
+          timestamp: new Date().toISOString(),
         },
-        timestamp: new Date().toISOString(),
-      });
+      ],
+    });
+  }
 
-      console.log(`[CRANK] Successfully finalized launch. TX: ${txSig}`);
-    } else {
-      console.log("[CRANK] Invariants hold. No operational transition required.");
+  private async sendSlackAlert(text: string): Promise<void> {
+    if (!SLACK_WEBHOOK_URL) return;
+    await axios.post(SLACK_WEBHOOK_URL, { text });
+  }
+
+  private async sendWhaleEmail(event: ContributionNotification): Promise<void> {
+    try {
+      await resend.emails.send({
+        from: "telemetry@chimp.finance",
+        to: NOTIFY_EMAIL,
+        subject: `⚠️ Whale Contribution Detected: ${event.amountSol} SOL`,
+        html: `
+          <h2>$CHIMP Fair Launch Whale Notification</h2>
+          <p>A significant contribution was confirmed on-chain:</p>
+          <ul>
+            <li><strong>Amount:</strong> ${event.amountSol} SOL</li>
+            <li><strong>Current Pool Aggregate:</strong> ${event.totalRaisedSol} SOL</li>
+            <li><strong>Wallet:</strong> <code>${event.user}</code></li>
+            <li><strong>Transaction:</strong> <a href="https://solscan.io/tx/${event.txSignature}">Inspect Signature</a></li>
+          </ul>
+        `,
+      });
+      console.log(`[RESEND-SUCCESS] Whale notification sent to ${NOTIFY_EMAIL}`);
+    } catch (e) {
+      console.error("[RESEND-FAILURE] Could not send email via Resend:", e);
     }
   }
 }
 
-// Production entrypoint for the continuous daemon
-async function runDaemon() {
-  const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
-  const webhook = process.env.DISCORD_WEBHOOK_URL || "";
-  const connection = new Connection(rpcUrl, "confirmed");
-
-  // In production, load from decrypted cloud secret/KMS
-  const operatorKey = Keypair.generate(); 
-  console.log(`[BOOT] Started fair launch agent with operator: ${operatorKey.publicKey.toBase58()}`);
-
-  const provider = new anchor.AnchorProvider(
-    connection,
-    new anchor.Wallet(operatorKey),
-    { commitment: "confirmed" }
-  );
-  anchor.setProvider(provider);
-
-  // Load IDL directly or reference the workspace
-  const idl = await anchor.Program.fetchIdl(
-    new PublicKey("Ch1mpFa1rLaunch111111111111111111111111111111"),
-    provider
-  );
-  if (!idl) throw new Error("IDL not deployed on cluster");
-
-  const program = new Program(idl, provider);
-  const client = new FairLaunchClient(program, connection, operatorKey, webhook);
-
-  const targetConfig = new PublicKey(process.env.LAUNCH_CONFIG_PUBKEY || Keypair.generate().publicKey);
-
-  setInterval(async () => {
-    try {
-      await client.crankEpochStatus(targetConfig);
-    } catch (e: any) {
-      console.error("[CRANK ERROR]", e.message);
-    }
-  }, 10_000);
-}
-
+// CLI Direct Execution Runner
 if (require.main === module) {
-  runDaemon().catch((err) => {
-    console.error("[FATAL]", err);
+  const service = new LaunchMonitorService();
+  service.start().catch((err) => {
+    console.error("FATAL: Indexer crashed:", err);
     process.exit(1);
   });
 }

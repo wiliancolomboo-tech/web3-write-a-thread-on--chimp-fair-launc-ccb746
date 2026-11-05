@@ -1,52 +1,33 @@
 flowchart TD
-    subgraph Users ["Contributors & Community"]
-        U1["User Wallet A (SOL)"]
-        U2["User Wallet B (SOL)"]
-        U3["User Wallet C (Whale)"]
+    subgraph Users & MEV Actors
+        U1[Legitimate Retail Contributor] -->|Deposit SOL / Commit| RPC[Solana Helius / Triton RPC]
+        BOT[MEV Sniper Bot / Jito Bundle] -.->|Front-run Attempt Blocked| RPC
     end
 
-    subgraph SolanaCluster ["Solana Mainnet-Beta / Devnet"]
-        subgraph ChimpProgram ["$CHIMP Fair Launch Anchor Program"]
-            CFG["Pool Config PDA\n(caps, slots, status)"]
-            ESCROW["Pool Sol Vault PDA\n(System Escrow)"]
-            T_VAULT["Token Distribution Vault\n(SPL Mint Escrow)"]
-            USER_REC["User Contribution PDA\n(deposit_lamports, claimed)"]
-        end
-
-        RPC["Solana Geyser / Jito / Triton RPC Nodes"]
+    subgraph Solana Runtime [Anchor Program: chimp_fair_launch]
+        RPC -->|Instruction: deposit_funds| SC[State Machine: Epoch Validation]
+        SC -->|Verify Quota & Timestamp| USR_ACC[User Contribution PDA]
+        SC -->|Escrow Lamports| ESCROW[Vault PDA Account]
+        
+        T_GRAD{Graduation Threshold Met?}
+        SC --> T_GRAD
+        
+        T_GRAD -- No --> CONT[Continue Epoch Allocation]
+        T_GRAD -- Yes --> MIGRATE[Instruction: graduate_and_migrate]
+        
+        MIGRATE -->|CPI: Mint $CHIMP| MINT_AUTH[Token 2022 / SPL Mint PDA]
+        MIGRATE -->|CPI: Initialize Pool| RAYDIUM[Raydium / Meteora Liquidity Pool]
+        MIGRATE -->|CPI: Burn LP Tokens| BURN[Token Burn Address 0x0...dead]
     end
 
-    subgraph OffChainEngine ["Enterprise Automation Daemon & Observability"]
-        LISTENER["WebSocket Log Subscriber\n(anchor.EventParser)"]
-        STATE_MGR["Epoch State Transitioner\n(Auto-finalizer / Pump)"]
-        NOTIFIER["Enterprise Webhook Relay\n(Discord / Slack / Resend)"]
+    subgraph Off-Chain Enterprise Worker & Alerting
+        OBS[Engine Listener / Event Streamer] -->|Subscribe to Program Logs| RPC
+        OBS -->|State Changed: Graduated| DISCORD[Discord Enterprise Webhook]
+        OBS -->|Alert High Volume| SLACK[Slack SecOps Incident Webhook]
+        OBS -->|Investor Receipt Dispatch| RESEND[Resend API: Transactional Email]
     end
 
-    subgraph OpsNotification ["Operations & Public Feed"]
-        DISCORD["Discord #chimp-launch-feed"]
-        SLACK["Slack #incident-operations"]
-        GRAFANA["Enterprise APM / Prometheus"]
+    subgraph Post-Launch Claims
+        U1 -->|Instruction: claim_tokens| CLAIM[Claim Engine]
+        CLAIM -->|Verify User Epoch Share| DISPENSE[Transfer $CHIMP to Contributor ATA]
     end
-
-    U1 -->|"1. deposit_sol()"| ChimpProgram
-    U2 -->|"1. deposit_sol()"| ChimpProgram
-    U3 -->|"1. deposit_sol() (Enforces Max Cap)"| ChimpProgram
-
-    ChimpProgram -->|"Updates State & Locks SOL"| ESCROW
-    ChimpProgram -->|"Tracks user shares"| USER_REC
-    ChimpProgram -->|"Emits ContributionEvent"| RPC
-
-    RPC -->|"WebSocket Stream: ProgramLogs"| LISTENER
-    LISTENER -->|"Validated Payload"| NOTIFIER
-    NOTIFIER -->|"Webhook Embed"| DISCORD
-    NOTIFIER -->|"Security Alert"| SLACK
-    LISTENER -->|"Metrics Dispatch"| GRAFANA
-
-    STATE_MGR -->|"Check End Slot"| RPC
-    STATE_MGR -->|"2. finalize_pool() (On Expiry)"| ChimpProgram
-    ChimpProgram -->|"Calculates Final Token Ratios"| CFG
-
-    U1 -->|"3. claim_tokens()"| ChimpProgram
-    ChimpProgram -->|"Transfers $CHIMP Tokens"| U1
-    ChimpProgram -->|"Refunds Excess Over-Allocated SOL"| U1
-    CFG -.->|"Unlocks Tokens"| T_VAULT

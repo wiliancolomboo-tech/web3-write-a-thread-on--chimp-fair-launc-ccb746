@@ -1,71 +1,83 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use crate::state::LaunchPool;
+use crate::errors::FairLaunchError;
 
-#[account]
-#[derive(Default)]
-pub struct LaunchConfig {
-    pub admin: Pubkey,
-    pub launch_id: u64,
-    pub chimp_mint: Pubkey,
-    pub token_escrow: Pubkey,
-    pub sol_vault: Pubkey,
-    pub total_tokens_allocated: u64,
-    pub total_lamports_raised: u64,
-    pub start_slot: u64,
-    pub end_slot: u64,
-    pub min_deposit_lamports: u64,
-    pub max_deposit_lamports: u64,
-    pub soft_cap_lamports: u64,
-    pub hard_cap_lamports: u64,
-    pub merkle_root: [u8; 32],
-    pub is_finalized: bool,
-    pub is_soft_cap_reached: bool,
-    pub liquidity_seeded: bool,
-    pub bump: u8,
-    pub vault_bump: u8,
+#[derive(Accounts)]
+pub struct InitializePool<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = LaunchPool::LEN,
+        seeds = [b"chimp_pool", token_mint.key().as_ref()],
+        bump
+    )]
+    pub pool: Account<'info, LaunchPool>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        init,
+        payer = authority,
+        seeds = [b"token_vault", pool.key().as_ref()],
+        bump,
+        token::mint = token_mint,
+        token::authority = pool,
+    )]
+    pub token_vault: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        constraint = authority_token_account.mint == token_mint.key(),
+        constraint = authority_token_account.owner == authority.key()
+    )]
+    pub authority_token_account: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
-impl LaunchConfig {
-    pub const LEN: usize = 8 + // discriminator
-        32 + // admin
-        8  + // launch_id
-        32 + // chimp_mint
-        32 + // token_escrow
-        32 + // sol_vault
-        8  + // total_tokens_allocated
-        8  + // total_lamports_raised
-        8  + // start_slot
-        8  + // end_slot
-        8  + // min_deposit_lamports
-        8  + // max_deposit_lamports
-        8  + // soft_cap_lamports
-        8  + // hard_cap_lamports
-        32 + // merkle_root
-        1  + // is_finalized
-        1  + // is_soft_cap_reached
-        1  + // liquidity_seeded
-        1  + // bump
-        1  + // vault_bump
-        64;  // padding
-}
+pub fn handler(
+    ctx: Context<InitializePool>,
+    total_tokens_allocated: u64,
+    start_slot: u64,
+    end_slot: u64,
+    soft_cap_lamports: u64,
+    hard_cap_lamports: u64,
+) -> Result<()> {
+    require!(start_slot < end_slot, FairLaunchError::InvalidSlotRange);
+    require!(soft_cap_lamports <= hard_cap_lamports, FairLaunchError::InvalidCapConfig);
+    require!(total_tokens_allocated > 0, FairLaunchError::ZeroTokenAllocation);
 
-#[account]
-#[derive(Default)]
-pub struct UserContribution {
-    pub participant: Pubkey,
-    pub launch_id: u64,
-    pub lamports_contributed: u64,
-    pub tokens_claimed: u64,
-    pub claimed: bool,
-    pub bump: u8,
-}
+    let pool = &mut ctx.accounts.pool;
+    pool.authority = ctx.accounts.authority.key();
+    pool.token_mint = ctx.accounts.token_mint.key();
+    pool.token_vault = ctx.accounts.token_vault.key();
+    pool.start_slot = start_slot;
+    pool.end_slot = end_slot;
+    pool.soft_cap_lamports = soft_cap_lamports;
+    pool.hard_cap_lamports = hard_cap_lamports;
+    pool.total_sol_deposited = 0;
+    pool.total_tokens_allocated = total_tokens_allocated;
+    pool.is_finalized = false;
+    pool.is_successful = false;
+    pool.bump = ctx.bumps.pool;
+    pool.vault_bump = ctx.bumps.token_vault;
 
-impl UserContribution {
-    pub const LEN: usize = 8 + // discriminator
-        32 + // participant
-        8  + // launch_id
-        8  + // lamports_contributed
-        8  + // tokens_claimed
-        1  + // claimed
-        1  + // bump
-        32;  // padding
+    // Escrow the allocated $CHIMP tokens into the pool's token vault
+    let transfer_ctx = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        Transfer {
+            from: ctx.accounts.authority_token_account.to_account_info(),
+            to: ctx.accounts.token_vault.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        },
+    );
+    token::transfer(transfer_ctx, total_tokens_allocated)?;
+
+    Ok(())
 }

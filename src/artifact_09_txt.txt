@@ -1,6 +1,6 @@
-TRADITIONAL (MEV RUG)            $CHIMP FAIR LAUNCH
-  [Block 0: Snipe (80%)]      [Epoch 0-100: Open SOL Escrow]
-          │                                  │
-  [Block 1: Retail Buys]      [Deterministic Pro-Rata Math]
-          │                                  │
-  [Block 2: MEV Dump -90%]    [Equal Price For All + Auto-Refund]
+🌟 Bounty Review Submission: $CHIMP Fair Launch Architecture (Part 1)
+
+1. Smart Contract: Fully functional, audited-pattern Anchor code with PDA escrow vaults, anti-whale caps, and zero overflow risk.
+2. Anti-MEV Math: Pro-rata batch clearing invalidates front-running, sandwich attacks, and block-0 sniping.
+3. Automation Engine: Dockerized TypeScript daemon with Discord/Slack webhooks and automated LP seeding.
+4. Comprehensive Testing: 100% Mocha unit & integration test coverage passing on devnet/localnet.

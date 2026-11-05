@@ -1,18 +1,25 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  chimp-daemon:
+  chimp-telemetry-agent:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: unless-stopped
+    container_name: chimp_telemetry_indexer
+    restart: always
     environment:
-      - SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
-      - SOLANA_WS_URL=${SOLANA_WS_URL:-wss://api.devnet.solana.com}
-      - PROGRAM_ID=${PROGRAM_ID:-CHiMPFaiRLaunch111111111111111111111111111}
-      - NOTIFICATION_WEBHOOK_URL=${NOTIFICATION_WEBHOOK_URL}
+      - NODE_ENV=production
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - PROGRAM_ID=CH1MP11111111111111111111111111111111111111
+      - RESEND_API_KEY=re_test_000000000000000000000000
+      - ALERT_EMAIL=security@chimp.finance
+      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00/B00/X00
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/00/xx
+      - PORT=8080
+    ports:
+      - "8080:8080"
     logging:
       driver: "json-file"
       options:
-        max-size: "20m"
+        max-size: "50m"
         max-file: "5"

@@ -1,0 +1,1 @@
+require!(new_user_total <= pool.max_deposit_lamports, LaunchError::DepositTooHigh);

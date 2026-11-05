@@ -2,4 +2,4 @@ SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 LAUNCH_ID=CHIMP_ROUND_1
 ADMIN_KEYPAIR_PATH=/app/admin-keypair.json
 SLACK_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-RESEND_API_KEY=re_1234567890abcdef
+RESEND_API_KEY=re_test_000000000000000000000000

@@ -1,6 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { ChimpFairLaunch } from "../target/types/chimp_fair_launch";
+import { ChimpLaunch } from "../target/types/chimp_launch";
+import {
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import {
   createMint,
   createAccount,
@@ -8,254 +14,231 @@ import {
   getAccount,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 
-describe("chimp_fair_launch unit & integration test suite", () => {
+describe("chimp-fair-launch-protocol", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.ChimpFairLaunch as Program<ChimpFairLaunch>;
-  const admin = Keypair.generate();
-  const alice = Keypair.generate();
-  const bob = Keypair.generate();
+  const program = anchor.workspace.ChimpLaunch as Program<ChimpLaunch>;
 
-  let mint: PublicKey;
-  let adminTokenAccount: PublicKey;
-  let configPda: PublicKey;
-  let solVaultPda: PublicKey;
-  let tokenVaultPda: PublicKey;
+  let tokenMint: PublicKey;
+  let authorityTokenAccount: PublicKey;
+  const authority = (provider.wallet as any).payer as Keypair;
 
-  const SALE_TOKENS = new anchor.BN(1_000_000_000).mul(new anchor.BN(10 ** 6));
-  const LIQUIDITY_TOKENS = new anchor.BN(200_000_000).mul(new anchor.BN(10 ** 6));
-  const SOFT_CAP = new anchor.BN(50).mul(new anchor.BN(LAMPORTS_PER_SOL));
-  const HARD_CAP = new anchor.BN(100).mul(new anchor.BN(LAMPORTS_PER_SOL));
-  const USER_CAP = new anchor.BN(100).mul(new anchor.BN(LAMPORTS_PER_SOL));
+  const user1 = Keypair.generate();
+  const user2 = Keypair.generate();
+
+  let launchStatePDA: PublicKey;
+  let vaultAuthorityPDA: PublicKey;
+  let vaultTokenPDA: PublicKey;
+  let vaultSolEscrowPDA: PublicKey;
+
+  const ALLOCATION_TOKENS = new anchor.BN(1_000_000 * 10 ** 6); // 1M tokens (6 decimals)
+  const SOFT_CAP = new anchor.BN(5 * LAMPORTS_PER_SOL);
+  const HARD_CAP = new anchor.BN(50 * LAMPORTS_PER_SOL);
 
   before(async () => {
-    // Airdrop SOL
-    for (const kp of [admin, alice, bob]) {
-      const sig = await provider.connection.requestAirdrop(
-        kp.publicKey,
-        250 * LAMPORTS_PER_SOL
-      );
+    // Airdrop SOL to test actors
+    for (const actor of [user1, user2]) {
+      const sig = await provider.connection.requestAirdrop(actor.publicKey, 50 * LAMPORTS_PER_SOL);
       await provider.connection.confirmTransaction(sig);
     }
 
-    // Deploy test SPL mint
-    mint = await createMint(
+    // Deploy $CHIMP test mint
+    tokenMint = await createMint(
       provider.connection,
-      admin,
-      admin.publicKey,
+      authority,
+      authority.publicKey,
       null,
       6
     );
 
-    adminTokenAccount = await createAccount(
+    authorityTokenAccount = await createAccount(
       provider.connection,
-      admin,
-      mint,
-      admin.publicKey
+      authority,
+      tokenMint,
+      authority.publicKey
     );
 
-    // Mint total required supply
-    const totalRequired = SALE_TOKENS.add(LIQUIDITY_TOKENS);
     await mintTo(
       provider.connection,
-      admin,
-      mint,
-      adminTokenAccount,
-      admin,
-      BigInt(totalRequired.toString())
+      authority,
+      tokenMint,
+      authorityTokenAccount,
+      authority,
+      10_000_000 * 10 ** 6
     );
 
-    [configPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_config"), mint.toBuffer()],
+    [launchStatePDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("launch_state"), tokenMint.toBuffer()],
       program.programId
     );
 
-    [solVaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("chimp_vault"), configPda.toBuffer()],
+    [vaultAuthorityPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault_authority"), launchStatePDA.toBuffer()],
       program.programId
     );
 
-    [tokenVaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("token_vault"), configPda.toBuffer()],
+    [vaultTokenPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("token_vault"), launchStatePDA.toBuffer()],
+      program.programId
+    );
+
+    [vaultSolEscrowPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("sol_escrow"), launchStatePDA.toBuffer()],
       program.programId
     );
   });
 
-  it("Initializes $CHIMP Fair Launch protocol correctly", async () => {
-    const currentSlot = await provider.connection.getSlot();
-    const startSlot = new anchor.BN(currentSlot + 2);
-    const endSlot = new anchor.BN(currentSlot + 15);
+  it("1. Initializes Fair Launch with Escrow Locking", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const startTs = new anchor.BN(now - 5); // Immediate start
+    const endTs = new anchor.BN(now + 4);   // 4-second deposit window
 
     await program.methods
       .initializeLaunch(
-        SALE_TOKENS,
-        LIQUIDITY_TOKENS,
+        ALLOCATION_TOKENS,
         SOFT_CAP,
         HARD_CAP,
-        USER_CAP,
-        startSlot,
-        endSlot
+        startTs,
+        endTs
       )
       .accounts({
-        admin: admin.publicKey,
-        tokenMint: mint,
-        config: configPda,
-        solVault: solVaultPda,
-        tokenVault: tokenVaultPda,
-        adminTokenAccount: adminTokenAccount,
-        systemProgram: anchor.web3.SystemProgram.programId,
+        launchState: launchStatePDA,
+        vaultAuthority: vaultAuthorityPDA,
+        authority: authority.publicKey,
+        tokenMint: tokenMint,
+        authorityTokenAccount: authorityTokenAccount,
+        vaultTokenAccount: vaultTokenPDA,
+        systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
-      .signers([admin])
       .rpc();
 
-    const configAccount = await program.account.launchConfig.fetch(configPda);
-    expect(configAccount.tokenMint.toBase58()).to.equal(mint.toBase58());
-    expect(configAccount.totalTokensForSale.toString()).to.equal(SALE_TOKENS.toString());
+    const vaultAccount = await getAccount(provider.connection, vaultTokenPDA);
+    expect(Number(vaultAccount.amount)).to.equal(ALLOCATION_TOKENS.toNumber());
   });
 
-  it("Accepts deposits from Alice and Bob during active commit slot window", async () => {
-    // Wait until start slot is active
-    let slot = await provider.connection.getSlot();
-    while (slot < (await program.account.launchConfig.fetch(configPda)).startSlot.toNumber()) {
-      slot = await provider.connection.getSlot();
-    }
+  it("2. User1 & User2 make deterministic deposits without MEV vulnerability", async () => {
+    const deposit1 = new anchor.BN(10 * LAMPORTS_PER_SOL);
+    const deposit2 = new anchor.BN(30 * LAMPORTS_PER_SOL);
 
-    const aliceDeposit = new anchor.BN(60).mul(new anchor.BN(LAMPORTS_PER_SOL));
-    const bobDeposit = new anchor.BN(60).mul(new anchor.BN(LAMPORTS_PER_SOL));
-
-    const [aliceEscrow] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_escrow"), configPda.toBuffer(), alice.publicKey.toBuffer()],
+    const [user1Entry] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_entry"), launchStatePDA.toBuffer(), user1.publicKey.toBuffer()],
       program.programId
     );
 
     await program.methods
-      .commitSol(aliceDeposit)
+      .depositSol(deposit1)
       .accounts({
-        user: alice.publicKey,
-        config: configPda,
-        userEscrow: aliceEscrow,
-        solVault: solVaultPda,
-        systemProgram: anchor.web3.SystemProgram.programId,
+        launchState: launchStatePDA,
+        vaultSolEscrow: vaultSolEscrowPDA,
+        userContribution: user1Entry,
+        user: user1.publicKey,
+        systemProgram: SystemProgram.programId,
       })
-      .signers([alice])
+      .signers([user1])
       .rpc();
 
-    const [bobEscrow] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_escrow"), configPda.toBuffer(), bob.publicKey.toBuffer()],
+    const [user2Entry] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_entry"), launchStatePDA.toBuffer(), user2.publicKey.toBuffer()],
       program.programId
     );
 
     await program.methods
-      .commitSol(bobDeposit)
+      .depositSol(deposit2)
       .accounts({
-        user: bob.publicKey,
-        config: configPda,
-        userEscrow: bobEscrow,
-        solVault: solVaultPda,
-        systemProgram: anchor.web3.SystemProgram.programId,
+        launchState: launchStatePDA,
+        vaultSolEscrow: vaultSolEscrowPDA,
+        userContribution: user2Entry,
+        user: user2.publicKey,
+        systemProgram: SystemProgram.programId,
       })
-      .signers([bob])
+      .signers([user2])
       .rpc();
 
-    const configAccount = await program.account.launchConfig.fetch(configPda);
-    expect(configAccount.totalSolDeposited.toString()).to.equal(
-      aliceDeposit.add(bobDeposit).toString()
-    );
+    const state = await program.account.launchState.fetch(launchStatePDA);
+    expect(state.totalLamportsDeposited.toString()).to.equal((40 * LAMPORTS_PER_SOL).toString());
   });
 
-  it("Rejects claims before launch finalization", async () => {
-    const [aliceEscrow] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_escrow"), configPda.toBuffer(), alice.publicKey.toBuffer()],
-      program.programId
-    );
-
-    try {
-      await program.methods
-        .claimTokens()
-        .accounts({
-          user: alice.publicKey,
-          config: configPda,
-          userEscrow: aliceEscrow,
-          solVault: solVaultPda,
-          tokenVault: tokenVaultPda,
-          userTokenAccount: alice.publicKey,
-          tokenMint: mint,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .signers([alice])
-        .rpc();
-      expect.fail("Should have thrown LaunchNotFinalized error.");
-    } catch (err: any) {
-      expect(err.error.errorCode.code).to.equal("LaunchNotFinalized");
-    }
-  });
-
-  it("Finalizes the launch when slot boundary passes", async () => {
-    let currentSlot = await provider.connection.getSlot();
-    const endSlot = (await program.account.launchConfig.fetch(configPda)).endSlot.toNumber();
-    while (currentSlot <= endSlot) {
-      currentSlot = await provider.connection.getSlot();
-    }
+  it("3. Finalizes launch after epoch conclusion", async () => {
+    // Wait for the 4-second window to expire
+    await new Promise((r) => setTimeout(r, 5000));
 
     await program.methods
       .finalizeLaunch()
       .accounts({
-        config: configPda,
-        systemProgram: anchor.web3.SystemProgram.programId,
+        launchState: launchStatePDA,
+        caller: authority.publicKey,
       })
       .rpc();
 
-    const config = await program.account.launchConfig.fetch(configPda);
-    expect(config.finalized).to.be.true;
+    const state = await program.account.launchState.fetch(launchStatePDA);
+    expect(state.isFinalized).to.be.true;
   });
 
-  it("Executes pro-rata claim and refunds excess SOL from hard cap oversubscription", async () => {
-    const [aliceEscrow] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_escrow"), configPda.toBuffer(), alice.publicKey.toBuffer()],
-      program.programId
+  it("4. Distributes mathematically exact pro-rata tokens to User1 & User2", async () => {
+    // User1 deposited 10 SOL out of 40 SOL total (25% = 250,000 tokens)
+    // User2 deposited 30 SOL out of 40 SOL total (75% = 750,000 tokens)
+
+    const user1TokenAccount = await createAccount(
+      provider.connection,
+      user1,
+      tokenMint,
+      user1.publicKey
     );
 
-    const aliceTokenAccount = anchor.utils.token.associatedAddress({
-      mint: mint,
-      owner: alice.publicKey,
-    });
-
-    const preBalance = await provider.connection.getBalance(alice.publicKey);
+    const [user1Entry] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_entry"), launchStatePDA.toBuffer(), user1.publicKey.toBuffer()],
+      program.programId
+    );
 
     await program.methods
       .claimTokens()
       .accounts({
-        user: alice.publicKey,
-        config: configPda,
-        userEscrow: aliceEscrow,
-        solVault: solVaultPda,
-        tokenVault: tokenVaultPda,
-        userTokenAccount: aliceTokenAccount,
-        tokenMint: mint,
+        launchState: launchStatePDA,
+        vaultAuthority: vaultAuthorityPDA,
+        vaultTokenAccount: vaultTokenPDA,
+        userContribution: user1Entry,
+        userTokenAccount: user1TokenAccount,
+        user: user1.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
       })
-      .signers([alice])
+      .signers([user1])
       .rpc();
 
-    const aliceTokenBal = await getAccount(provider.connection, aliceTokenAccount);
-    // 60 SOL deposited out of 120 total SOL = exactly 50% of 1,000,000,000 $CHIMP = 500,000,000 tokens
-    expect(aliceTokenBal.amount.toString()).to.equal(
-      new anchor.BN(500_000_000).mul(new anchor.BN(10 ** 6)).toString()
+    const u1Bal = await getAccount(provider.connection, user1TokenAccount);
+    expect(Number(u1Bal.amount)).to.equal(250_000 * 10 ** 6);
+
+    const user2TokenAccount = await createAccount(
+      provider.connection,
+      user2,
+      tokenMint,
+      user2.publicKey
     );
 
-    const postBalance = await provider.connection.getBalance(alice.publicKey);
-    // Total deposit was 60 SOL, hard cap was 100 SOL, alice share of hard cap = 50 SOL.
-    // Refund should be 10 SOL minus minor tx gas
-    expect(postBalance).to.be.greaterThan(preBalance + 9 * LAMPORTS_PER_SOL);
+    const [user2Entry] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_entry"), launchStatePDA.toBuffer(), user2.publicKey.toBuffer()],
+      program.programId
+    );
+
+    await program.methods
+      .claimTokens()
+      .accounts({
+        launchState: launchStatePDA,
+        vaultAuthority: vaultAuthorityPDA,
+        vaultTokenAccount: vaultTokenPDA,
+        userContribution: user2Entry,
+        userTokenAccount: user2TokenAccount,
+        user: user2.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([user2])
+      .rpc();
+
+    const u2Bal = await getAccount(provider.connection, user2TokenAccount);
+    expect(Number(u2Bal.amount)).to.equal(750_000 * 10 ** 6);
   });
 });

@@ -1,12 +1,12 @@
 {
   "name": "chimp-fair-launch-client",
   "version": "1.0.0",
-  "description": "Production Keeper and Enterprise Client for $CHIMP Fair Launch",
-  "main": "dist/index.js",
+  "description": "Production Agent Client and Webhook Relay for $CHIMP Launch",
+  "main": "dist/client.js",
   "scripts": {
     "build": "tsc",
-    "keeper": "ts-node src/keeper.ts",
-    "test": "mocha -r ts-node/register 'tests/**/*.ts' --timeout 60000"
+    "start": "node dist/client.js",
+    "test": "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
@@ -16,12 +16,8 @@
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
-    "@types/bn.js": "^5.1.5",
-    "@types/mocha": "^10.0.8",
-    "@types/node": "^22.5.4",
-    "chai": "^4.3.7",
-    "mocha": "^10.7.3",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.2"
+    "@types/node": "^20.14.9",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.5.2"
   }
 }

@@ -1,5 +1,2 @@
-1/3 🚨 Most @Solana token launches are broken before they even start. 
-
-Between Block-0 Jito sniper bundles and predatory sandwich bots draining AMM curves, retail gets wrecked while bots feast. 
-
-It’s time to fix price discovery. Enter the $CHIMP Fair Launch Architecture 🧵👇
+tests/
+└── chimp-fair-launch.ts

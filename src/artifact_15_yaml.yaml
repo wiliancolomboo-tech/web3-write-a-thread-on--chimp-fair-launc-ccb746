@@ -1,20 +1,16 @@
 version: "3.8"
 
 services:
-  chimp-monitor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: always
+  chimp-sentinel:
+    build: .
+    restart: unless-stopped
     environment:
       - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - PROGRAM_ID=Ch1mpFa1rLaunch11111111111111111111111111111
-      - TOKEN_MINT=So11111111111111111111111111111111111111112
-      - SLACK_OR_DISCORD_WEBHOOK=${SLACK_OR_DISCORD_WEBHOOK}
-      - RESEND_API_KEY=${RESEND_API_KEY}
-      - OPS_ADMIN_EMAIL=${OPS_ADMIN_EMAIL}
-    healthcheck:
-      test: ["CMD-SHELL", "node -e 'console.log(process.uptime())'"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - PROGRAM_ID=CH1MPy8vD3mN1A3vQGZ8r6gK2T3Lq6mZ7dE1h5J9XYZ
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/dummy/chimp-alerts
+      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/dummy/chimp-alerts
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

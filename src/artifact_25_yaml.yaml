@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  chimp-crank-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chimp_fair_launch_crank
+    restart: always
+    environment:
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - SOLANA_WS_URL=wss://api.mainnet-beta.solana.com
+      - PROGRAM_ID=Ch1mpFa1rLaunch11111111111111111111111111111
+      - CHIMP_TOKEN_MINT=71yE9L9N76b8X9m8Y4J2a7R2J5F8sL8R2h3k9J1M4pump
+      - CRANK_KEYPAIR_JSON=${CRANK_KEYPAIR_JSON}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - ALERT_EMAIL_RECIPIENT=devops@chimp.capital
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

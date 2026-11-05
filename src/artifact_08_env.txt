@@ -1,6 +1,7 @@
-SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-KEYPAIR_PATH=./secrets/crank-keypair.json
-IDL_PATH=./target/idl/chimp_fair_launch.json
-PROGRAM_ID=CHMPf1rLaunch11111111111111111111111111111
-POOL_ID=1
-ENTERPRISE_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
+ANCHOR_PROVIDER_URL=https://api.mainnet-beta.solana.com
+ANCHOR_WALLET=/app/keys/id.json
+CHIMP_PROGRAM_ID=Ch1mpFL11111111111111111111111111111111111111
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00/B00/XXXX
+RESEND_API_KEY=re_test_000000000000000000000000
+OPERATIONAL_EMAIL=devops@chimpfairlaunch.io
+PORT=8080

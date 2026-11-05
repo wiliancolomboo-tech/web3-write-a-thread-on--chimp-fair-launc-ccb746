@@ -1,35 +1,34 @@
 flowchart TD
-    subgraph Clients ["Client & Automation Tier"]
-        U1["Retail Contributor"]
-        U2["Institutional Participant"]
-        KEEPER["Enterprise Chimp Keeper / Bot"]
-        HOOK["Enterprise Webhook Relay\n(Discord / Slack / Resend)"]
+    subgraph Users & Searchers
+        U1[Retail Participant 1] -->|commit_sol| EP[Solana RPC Cluster]
+        U2[Retail Participant 2] -->|commit_sol| EP
+        MEV[MEV Bot / Searcher] -->|commit_sol - Zero MEV Advantage| EP
     end
 
-    subgraph SolanaCluster ["Solana Runtime (Anchor Program)"]
-        CONFIG["Global Config PDA\n['config', mint]"]
-        VAULT["SOL Treasury PDA\n['vault', config]"]
-        MINT["$CHIMP Mint Authority PDA"]
-        USER_ESCROW["User Escrow PDA\n['user_escrow', config, user]"]
-        ESCROW_TOKEN["Token Vault PDA\n['token_vault', config]"]
+    subgraph Solana Program: chimp_fair_launch
+        EP --> IP[Instruction Processor]
+        IP --> VAL{State Check}
+        VAL -->|Within Slot Window| ACC[Accumulate Vault Balance]
+        VAL -->|Slot Expired / Softcap Fail| REF[Enable Pro-Rata Refunds]
+        ACC --> PDA_V[Escrow Vault PDA]
+        ACC --> USER_PDA[User Contribution PDA]
+        
+        IP --> FIN[finalize_pool]
+        FIN --> CALC[Compute Final Clear Price]
+        CALC --> LP_SEED[Atomic Seed to DEX AMM / Burn LP]
+        CALC --> CLAIM_EN[Enable Token Claims]
     end
 
-    subgraph DEXLiquidity ["DEX Liquidity Migration"]
-        RAYDIUM["Raydium / Meteora Liquidity Pool"]
-        BURN["LP Token Burn Address\n(Immutable Dead PDA)"]
+    subgraph Off-Chain Agent & Automation Engine
+        LOGS[Solana Event Logs / WebSocket] --> IDX[Chimp Stream Indexer]
+        IDX --> PARSE[Parse Event Data]
+        PARSE --> DB[(Audit Ledger / Redis Cache)]
+        PARSE --> DISPATCH[Enterprise Notification Gateway]
+        DISPATCH --> SLACK[Slack Operations Channel]
+        DISPATCH --> DISCORD[Discord Community Tracker]
+        DISPATCH --> RESEND[Resend API: Whale Inflow Alert]
     end
 
-    U1 -->|1. Commit SOL (Slot X..Y)| USER_ESCROW
-    U2 -->|1. Commit SOL (Slot X..Y)| USER_ESCROW
-    USER_ESCROW -->|Aggregates into| VAULT
-
-    KEEPER -->|2. Check Finalized Slot > EndSlot| CONFIG
-    KEEPER -->|3. Trigger Finalize Epoch| CONFIG
-
-    CONFIG -->|4. Unlock Claims| USER_ESCROW
-    CONFIG -->|5. Auto-Migrate Protocol Liquidity| RAYDIUM
-    RAYDIUM -->|6. Permanent LP Lock| BURN
-
-    U1 -->|7. Permissionless Claim $CHIMP & Excess SOL| USER_ESCROW
-    USER_ESCROW -->|8. Transfer Minted $CHIMP| U1
-    CONFIG -.->|Telemetry Event Dispatch| HOOK
+    CLAIM_EN --> USER_CLAIM[User claim_tokens]
+    USER_PDA --> USER_CLAIM
+    USER_CLAIM --> T_MINT[$CHIMP Token Minted / Transferred]

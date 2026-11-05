@@ -2,6 +2,6 @@ SOLANA_RPC_URL="https://devnet.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY"
 PROGRAM_ID="Ch1mpLaunch111111111111111111111111111111111"
 TOKEN_MINT="YOUR_CHIMP_TOKEN_MINT_ADDRESS"
 DISCORD_WEBHOOK_URL="https://api.example.com/webhooks/alerts/placeholder"
-RESEND_API_KEY="re_123456789enterprise"
+RESEND_API_KEY="re_test_000000000000000000000000"
 ALERT_EMAIL="security-ops@chimp.finance"
 PORT=8080

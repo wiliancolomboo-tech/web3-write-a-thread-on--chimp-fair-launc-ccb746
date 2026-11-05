@@ -1,5 +1,8 @@
-Instead of a predatory latency race, $CHIMP uses an on-chain, deterministic proportional clearing vault.
-
-100% of deposits are locked in an Anchor Escrow PDA during the window. Zero MEV sandwiching. If over-subscribed, everyone gets a fair pro-rata allocation & instant SOL refunds.
-
-No bots dumping on block 1.
+client/
+├── package.json
+├── tsconfig.json
+├── src/
+│   ├── config.ts
+│   ├── notifier.ts
+│   ├── listener.ts
+│   └── cli.ts

@@ -1,15 +1,14 @@
-# 1. Environment initialization
+# 1. Install dependencies
+yarn install
+
+# 2. Build Anchor IDL and optimized WASM program
 anchor build
 
-# 2. Verify deterministic binary hashes
-sha256sum target/deploy/chimp_fair_launch.so
+# 3. Synchronize program keys
+solana address -k target/deploy/chimp_fair_launch-keypair.json
+# Ensure ID matches declare_id!() in lib.rs
 
-# 3. Deploy to Solana Devnet / Mainnet-Beta
-solana program deploy \
-  --program-id target/deploy/chimp_fair_launch-keypair.json \
-  target/deploy/chimp_fair_launch.so \
-  --url https://api.devnet.solana.com
-
-# 4. Initialize launch pool via Anchor
-npm install
-npx ts-node scripts/init-launch.ts
+# 4. Deploy to Solana Devnet / Mainnet
+solana config set --url https://api.devnet.solana.com
+solana airdrop 2
+anchor deploy --program-name chimp_fair_launch --provider.cluster devnet

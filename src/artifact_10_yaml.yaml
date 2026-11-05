@@ -1,19 +1,26 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  chimp-sentinel:
+  chimp-crank-engine:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: unless-stopped
-    command: ["watch", "-r", "https://api.mainnet-beta.solana.com", "-k", "/secrets/deployer.json", "-i", "./target/idl/chimp_fair_launch.json", "-p", "CH1MP1aunchXvL8xGk8xK8vBwFzV8qg2p9vRjNmK9XkQ", "-l", "1001"]
-    volumes:
-      - ./secrets:/secrets:ro
+    container_name: chimp-crank-engine
+    restart: always
     environment:
-      - DISCORD_WEBHOOK_URL=https://api.example.com/webhooks/alerts/placeholder
-      - RESEND_API_KEY=re_enterprise_key_test
+      - ANCHOR_PROVIDER_URL=${ANCHOR_PROVIDER_URL}
+      - ANCHOR_WALLET=/app/keys/id.json
+      - CHIMP_PROGRAM_ID=${CHIMP_PROGRAM_ID}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - OPERATIONAL_EMAIL=${OPERATIONAL_EMAIL}
+      - PORT=8080
+    volumes:
+      - ./keys:/app/keys:ro
+    ports:
+      - "8080:8080"
     logging:
       driver: "json-file"
       options:
-        max-size: "20m"
+        max-size: "100m"
         max-file: "5"

@@ -1,1 +1,2 @@
-npx ts-node scripts/force-finalize.ts --pool <POOL_PDA_ADDRESS>
+docker-compose up -d
+   docker-compose logs -f chimp-keeper

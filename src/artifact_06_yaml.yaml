@@ -1,17 +1,22 @@
-version: "3.8"
+version: "3.9"
 
 services:
-  chimp-telemetry-daemon:
+  chimp-fair-launch-watcher:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: always
+    restart: unless-stopped
     environment:
       - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - PROGRAM_ID=ChimpLaunch111111111111111111111111111111111
+      - PROGRAM_ID=Ch1mpFL111111111111111111111111111111111111
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - VIP_ALERT_EMAIL=${VIP_ALERT_EMAIL}
+      - ALERT_EMAIL=admin@chimp.capital
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'process.exit(0)'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     logging:
       driver: "json-file"
       options:

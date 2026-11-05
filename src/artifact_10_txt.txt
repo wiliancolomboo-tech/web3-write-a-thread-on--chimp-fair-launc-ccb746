@@ -1,2 +1,2 @@
-tests/
-└── chimp_fair_launch.ts
+[Virtual Reserve vy] * [Virtual SOL vx] = Constant Invariant K
+Total Tokens Claimed = (User SOL / Total Raised SOL) * 500M $CHIMP

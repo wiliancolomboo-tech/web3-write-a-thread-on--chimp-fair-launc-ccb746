@@ -1,4 +1,22 @@
-contracts/chimp_fair_launch/
-├── Cargo.toml
-└── src/
-    └── lib.rs
++--------------------------------------------------------------------------------------------------+
+|                                    SVM INTEGRATION TOPOLOGY                                      |
++--------------------------------------------------------------------------------------------------+
+|                                                                                                  |
+|   +-------------------+          RPC / WebSocket Subscriptions         +---------------------+   |
+|   |                   | <--------------------------------------------> |                     |   |
+|   |  $CHIMP Crank     |          Jito Bundle Tip Stream (MEV Guard)    | Solana RPC Cluster  |   |
+|   |  Worker Service   | <--------------------------------------------> | (Mainnet / Devnet)  |   |
+|   |  (Docker Node.js) |                                                |                     |   |
+|   +---------+---------+                                                +----------+----------+   |
+|             |                                                                     |              |
+|             | Event Webhook Dispatch                                              | On-Chain     |
+|             | (HTTPS POST / JSON)                                                 | Transactions |
+|             v                                                                     v              |
+|   +------------------------------------+                       +------------------------------+  |
+|   | Real-Time Enterprise Infrastructure|                       | Anchor Program Deployment    |  |
+|   | - Discord / Slack Alert Channels   |                       | Program ID:                  |  |
+|   | - Resend Transaction Verification  |                       | Ch1mpFL111111111111111111111 |  |
+|   | - Prometheus Metric Telemetry      |                       | 111111111111                 |  |
+|   +------------------------------------+                       +------------------------------+  |
+|                                                                                                  |
++--------------------------------------------------------------------------------------------------+
